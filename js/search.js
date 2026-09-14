@@ -1,0 +1,56 @@
+/**
+ * search.js
+ * Pure functions: given the roster + current filter state, return the
+ * matching subset. No DOM access here, so it's easy to reason about
+ * and reuse (e.g. from a future admin export tool).
+ */
+
+function normalize(str) {
+  return (str || "").toString().trim().toLowerCase();
+}
+
+/**
+ * @param {Array} students full roster
+ * @param {Object} state { term, field, grade, class, gender, subject }
+ */
+export function filterStudents(students, state) {
+  const term = normalize(state.term);
+  const terms = term.length ? term.split(/\s+/) : [];
+
+  return students.filter((s) => {
+    if (state.grade && String(s.grade) !== String(state.grade)) return false;
+    if (state.class && s.class !== state.class) return false;
+    if (state.gender && s.gender !== state.gender) return false;
+    if (state.subject && !(s.subjectsSummary || []).includes(state.subject))
+      return false;
+
+    if (!terms.length) return true;
+
+    if (state.field === "admin") {
+      return normalize(s.adminNo) === term;
+    }
+
+    if (state.field === "class") {
+      return normalize(s.registrationClass).includes(term) ||
+        normalize(s.class).includes(term);
+    }
+
+    if (state.field === "name") {
+      return terms.every((t) => (s.searchTokens || []).some((tok) => tok.includes(t)));
+    }
+
+    // auto: admin exact OR every typed word matches some search token
+    return (
+      normalize(s.adminNo) === term ||
+      terms.every((t) => (s.searchTokens || []).some((tok) => tok.includes(t)))
+    );
+  });
+}
+
+/** Sort by surname then first name, for a stable, predictable list order. */
+export function sortStudents(students) {
+  return [...students].sort((a, b) =>
+    normalize(a.lastName).localeCompare(normalize(b.lastName)) ||
+    normalize(a.firstName).localeCompare(normalize(b.firstName)),
+  );
+}
