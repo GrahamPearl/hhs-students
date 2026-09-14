@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Importer</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 20px;
+        background: #f5f7fa;
+    }
+
+    h1 {
+        color: #1e3a8a;
+    }
+
+    .card {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    button {
+        background: #2563eb;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        margin-top: 10px;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #1d4ed8;
+    }
+
+    #status {
+        margin-top: 15px;
+        font-weight: bold;
+    }
+
+    #log {
+        margin-top: 20px;
+        background: #111827;
+        color: #10b981;
+        padding: 15px;
+        height: 350px;
+        overflow-y: auto;
+        font-family: Consolas, monospace;
+        border-radius: 8px;
+    }
+
+    progress {
+        width: 100%;
+        height: 25px;
+        margin-top: 15px;
+    }
+</style>
+</head>
+<body>
+
+<div class="card">
+
+    <h1>Student Import Utility</h1>
+
+    <input type="file" id="jsonFile" accept=".json">
+
+    <br>
+
+    <button onclick="importStudents()">
+        Import Students
+    </button>
+
+    <progress id="progress" value="0" max="100"></progress>
+
+    <div id="status">
+        Waiting...
+    </div>
+
+    <div id="log"></div>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+
+import {
+    getFirestore,
+    doc,
+    setDoc,
+    writeBatch
+}
+from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+const firebaseConfig = {
+
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "XXXXXXXX",
+    appId: "XXXXXXXX"
+
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+function log(message)
+{
+    const logDiv = document.getElementById("log");
+
+    logDiv.innerHTML += message + "<br>";
+
+    logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+window.importStudents = async function ()
+{
+    const fileInput = document.getElementById("jsonFile");
+
+    const file = fileInput.files[0];
+
+    if (!file)
+    {
+        alert("Select students.json");
+        return;
+    }
+
+    try
+    {
+        document.getElementById("status").textContent =
+            "Reading file...";
+
+        const text = await file.text();
+
+        const data = JSON.parse(text);
+
+        let students = [];
+
+        if (Array.isArray(data))
+        {
+            students = data;
+        }
+        else
+        {
+            students = Object.values(data);
+        }
+
+        document.getElementById("status").textContent =
+            `Found ${students.length} students`;
+
+        let imported = 0;
+        let skipped = 0;
+
+        const batchSize = 400;
+
+        for (let i = 0; i < students.length; i += batchSize)
+        {
+            const batch = writeBatch(db);
+
+            const chunk =
+                students.slice(i, i + batchSize);
+
+            for (const student of chunk)
+            {
+                const adminNo =
+                    student.adminNo ||
+                    student.ADMNO ||
+                    student.admNo;
+
+                if (!adminNo)
+                {
+                    skipped++;
+
+                    log(
+                        `Skipping record with no admin number`
+                    );
+
+                    continue;
+                }
+
+                const docRef =
+                    doc(
+                        db,
+                        "students",
+                        String(adminNo)
+                    );
+
+                batch.set(docRef, student);
+            }
+
+            await batch.commit();
+
+            imported += chunk.length;
+
+            const percentage =
+                Math.round(
+                    (imported /
+                        students.length) * 100
+                );
+
+            document.getElementById(
+                "progress"
+            ).value = percentage;
+
+            document.getElementById(
+                "status"
+            ).textContent =
+                `Imported ${imported} / ${students.length}`;
+
+            log(
+                `Batch imported (${imported}/${students.length})`
+            );
+        }
+
+        document.getElementById("status")
+            .textContent =
+            "Import Complete";
+
+        log(
+            `✅ Imported: ${imported}`
+        );
+
+        log(
+            `⚠️ Skipped: ${skipped}`
+        );
+    }
+    catch (error)
+    {
+        console.error(error);
+
+        document.getElementById("status")
+            .textContent =
+            "Import Failed";
+
+        log(
+            `❌ ${error.message}`
+        );
+    }
+};
+
+</script>
+
+</body>
+</html>
