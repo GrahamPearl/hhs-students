@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hillcrest — Roster Migration Console</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/migrate.css" />
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="crest" aria-hidden="true">HHS</div>
+      <div>
+        <h1 class="site-title">Roster Migration Console</h1>
+        <p class="site-subtitle">LOAD &amp; UPDATE students.json IN FIRESTORE</p>
+      </div>
+      <div class="header-spacer"></div>
+      <div id="userBadge" class="user-badge"></div>
+      <button id="signOutBtn" class="btn btn-ghost btn-on-dark">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page page-narrow">
+
+    <!-- Auth gate -->
+    <section id="authGate" class="panel">
+      <h2 class="panel-title">Sign in</h2>
+      <p class="panel-hint">
+        Writing to Firestore requires an authenticated staff account
+        (see Firestore Security Rules).
+      </p>
+      <form id="authForm" class="auth-form">
+        <div>
+          <label for="authEmail">Email</label>
+          <input type="email" id="authEmail" required autocomplete="username" />
+        </div>
+        <div>
+          <label for="authPassword">Password</label>
+          <input type="password" id="authPassword" required autocomplete="current-password" />
+        </div>
+        <button type="submit" class="btn btn-primary">Sign in</button>
+      </form>
+      <p id="authError" class="error-text"></p>
+    </section>
+
+    <!-- Migration tool -->
+    <section id="toolPanel" class="is-hidden">
+
+      <section class="panel">
+        <h2 class="panel-title">1. Choose a students.json file</h2>
+        <p class="panel-hint">
+          Works for both the very first import and later updates — existing
+          records are compared before anything is written, so an update run
+          only touches what actually changed.
+        </p>
+        <div id="dropZone" class="drop-zone">
+          <p><strong>Drop students.json here</strong> or click to browse</p>
+          <input type="file" id="fileInput" accept=".json,application/json" hidden />
+        </div>
+        <div id="fileSummary" class="file-summary"></div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">2. Compare against Firestore</h2>
+        <button id="compareBtn" class="btn btn-primary" disabled>Compare</button>
+        <div id="diffSummary" class="diff-summary"></div>
+        <div id="diffLog" class="diff-log"></div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">3. Write changes</h2>
+        <label class="checkbox-row">
+          <input type="checkbox" id="dryRun" checked />
+          Dry run (preview only — nothing is written)
+        </label>
+        <button id="runBtn" class="btn btn-primary" disabled>Write to Firestore</button>
+
+        <div id="progressWrap" class="progress-wrap is-hidden">
+          <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+          <span id="progressLabel" class="progress-label"></span>
+        </div>
+        <div id="runStatus" class="run-status"></div>
+      </section>
+
+    </section>
+
+  </main>
+
+  <script src="js/config.js"></script>
+  <script type="module" src="js/migrate-app.js"></script>
+</body>
+</html>
