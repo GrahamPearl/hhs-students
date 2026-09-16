@@ -3,7 +3,7 @@
  */
 import { getAllStudents, collectSubjects, collectClasses } from "./data-service.js";
 import { filterStudents, sortStudents } from "./search.js";
-import { renderRows, renderResultCount, renderEmptyState, renderDrawer } from "./render.js";
+import { renderRows, renderResultCount, renderEmptyState, renderDrawerHeader, renderDrawerView } from "./render.js";
 
 const els = {
   form: document.getElementById("searchForm"),
@@ -13,19 +13,28 @@ const els = {
   class: document.getElementById("filterClass"),
   gender: document.getElementById("filterGender"),
   subject: document.getElementById("filterSubject"),
+  teacher: document.getElementById("filterTeacher"), // Added teacher element
   resetBtn: document.getElementById("resetBtn"),
   tbody: document.getElementById("resultsBody"),
   resultCount: document.getElementById("resultCount"),
   loadingState: document.getElementById("loadingState"),
   tableWrap: document.getElementById("tableWrap"),
   drawer: document.getElementById("drawer"),
-  drawerBody: document.getElementById("drawerBody"),
+  drawerHeader: document.getElementById("drawerHeader"), // Make sure this matches index.html
+  drawerContent: document.getElementById("drawerContent"), // Make sure this matches index.html
   drawerClose: document.getElementById("drawerClose"),
   scrim: document.getElementById("scrim"),
-};
+  authWidget: document.getElementById("authWidget"),
+  authToggleBtn: document.getElementById("authToggleBtn"),
+  authPopover: document.getElementById("authPopover"),
 
-const COL_COUNT = 6;
-let roster = [];
+  openFiltersBtn: document.getElementById("openFiltersBtn"),
+  filterModal: document.getElementById("filterModal"),
+  filterModalClose: document.getElementById("filterModalClose"),
+  filterApplyBtn: document.getElementById("filterApplyBtn"),
+  filterClearBtn: document.getElementById("filterClearBtn"),
+  filterCountBadge: document.getElementById("filterCountBadge"),
+};
 
 const state = () => ({
   term: els.query.value,
@@ -34,7 +43,12 @@ const state = () => ({
   class: els.class.value,
   gender: els.gender.value,
   subject: els.subject.value,
+  teacher: els.teacher.value, // Added teacher state
 });
+
+const COL_COUNT = 6;
+let roster = [];
+
 
 function runSearch() {
   const results = sortStudents(filterStudents(roster, state()));
@@ -57,10 +71,40 @@ function refreshClassOptions() {
   populateSelect(els.class, collectClasses(roster, els.grade.value), "All classes");
 }
 
+function refreshTeacherOptions() {
+  const selectedSubject = els.subject.value;
+  
+  if (!selectedSubject) {
+    els.teacher.innerHTML = '<option value="">Select a subject first</option>';
+    els.teacher.value = "";
+    els.teacher.disabled = true;
+    return;
+  }
+
+  // Generate the slugified key matching render.js logic (e.g., "mathematics" -> "mathematics")
+  const subjectKey = selectedSubject.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const teachers = new Set();
+
+  roster.forEach((student) => {
+    if (student.enrollments) {
+      // Look up enrollment using either the slugified key or the exact subject name
+      const enr = student.enrollments[subjectKey] || student.enrollments[selectedSubject];
+      if (enr && enr.teacher) {
+        teachers.add(enr.teacher);
+      }
+    }
+  });
+
+  const teacherArray = Array.from(teachers).filter(Boolean).sort();
+  populateSelect(els.teacher, teacherArray, "All teachers");
+  els.teacher.disabled = teacherArray.length === 0;
+}
+
 function openDrawer(adminNo) {
   const student = roster.find((s) => String(s.adminNo) === String(adminNo));
   if (!student) return;
-  els.drawerBody.innerHTML = renderDrawer(student);
+  els.drawerHeader.innerHTML = renderDrawerHeader(student);
+  els.drawerContent.innerHTML = renderDrawerView(student, false); // Pass true/false for isAdmin if needed
   els.drawer.classList.add("is-open");
   els.scrim.classList.add("is-visible");
   document.body.classList.add("no-scroll");
@@ -88,7 +132,16 @@ function wireEvents() {
   els.query.addEventListener("input", debounce(runSearch, 150));
   els.field.addEventListener("change", runSearch);
   els.gender.addEventListener("change", runSearch);
-  els.subject.addEventListener("change", runSearch);
+  
+  // Update subject change to refresh teachers and run search
+  els.subject.addEventListener("change", () => {
+    refreshTeacherOptions();
+    runSearch();
+  });
+  
+  // Listen for changes on the teacher dropdown
+  els.teacher.addEventListener("change", runSearch);
+
   els.grade.addEventListener("change", () => {
     refreshClassOptions();
     runSearch();
@@ -98,6 +151,7 @@ function wireEvents() {
   els.resetBtn.addEventListener("click", () => {
     els.form.reset();
     refreshClassOptions();
+    refreshTeacherOptions(); // Reset teacher dropdown state
     runSearch();
   });
 
@@ -109,6 +163,52 @@ function wireEvents() {
   els.scrim.addEventListener("click", closeDrawer);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeDrawer();
+  });
+
+  // Toggle staff auth popover visibility
+  if (els.authToggleBtn && els.authPopover) {
+    els.authToggleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      els.authPopover.classList.toggle("is-hidden");
+    });
+
+    // Close the popover when clicking outside of the auth widget
+    document.addEventListener("click", (e) => {
+      if (els.authWidget && !els.authWidget.contains(e.target)) {
+        els.authPopover.classList.add("is-hidden");
+      }
+    });
+  }
+
+  // Toggle filter panel visibility
+  els.openFiltersBtn.addEventListener("click", () => {
+    els.filterModal.classList.toggle("is-hidden");
+  });
+
+  // Close filter panel via close button
+  els.filterModalClose.addEventListener("click", () => {
+    els.filterModal.classList.add("is-hidden");
+  });
+
+  // Apply filters: run search and hide panel
+  els.filterApplyBtn.addEventListener("click", () => {
+    els.filterModal.classList.add("is-hidden");
+    runSearch();
+  });
+
+  // Clear filters inside the modal
+  els.filterClearBtn.addEventListener("click", () => {
+    els.grade.value = "";
+    els.class.value = "";
+    els.gender.value = "";
+    els.subject.value = "";
+    if (els.teacher) {
+      els.teacher.value = "";
+      els.teacher.disabled = true;
+      els.teacher.innerHTML = '<option value="">Select a subject first</option>';
+    }
+    refreshClassOptions();
+    runSearch();
   });
 }
 
@@ -125,6 +225,7 @@ async function init() {
 
   populateSelect(els.subject, collectSubjects(roster), "All subjects");
   refreshClassOptions();
+  refreshTeacherOptions(); // Initialize teacher dropdown state
 
   els.loadingState.remove();
   els.tableWrap.classList.remove("is-hidden");

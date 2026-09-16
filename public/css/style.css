@@ -170,6 +170,8 @@ input[type="text"]:focus, select:focus {
 }
 #resultCount { font-weight: 600; color: var(--ink); }
 
+.is-hidden { display: none; }
+
 /* ---------- Table ---------- */
 .table-wrap {
   background: var(--paper-raised);
