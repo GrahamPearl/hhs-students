@@ -1,89 +1,177 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Welcome to Firebase Hosting</title>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hillcrest High School — Student Lookup</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
 
-    <!-- update the version number as needed -->
-    <script defer src="/__/firebase/12.19.0/firebase-app-compat.js"></script>
-    <!-- include only the Firebase features as you need -->
-    <script defer src="/__/firebase/12.19.0/firebase-auth-compat.js"></script>
-    <script defer src="/__/firebase/12.19.0/firebase-database-compat.js"></script>
-    <script defer src="/__/firebase/12.19.0/firebase-firestore-compat.js"></script>
-    <script defer src="/__/firebase/12.19.0/firebase-functions-compat.js"></script>
-    <script defer src="/__/firebase/12.19.0/firebase-messaging-compat.js"></script>
-    <script defer src="/__/firebase/12.19.0/firebase-storage-compat.js"></script>
-    <script defer src="/__/firebase/12.19.0/firebase-analytics-compat.js"></script>
-    <script defer src="/__/firebase/12.19.0/firebase-remote-config-compat.js"></script>
-    <script defer src="/__/firebase/12.19.0/firebase-performance-compat.js"></script>
-    <!-- 
-      initialize the SDK after all desired features are loaded, set useEmulator to false
-      to avoid connecting the SDK to running emulators.
-    -->
-    <script defer src="/__/firebase/init.js?useEmulator=true"></script>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="crest" aria-hidden="true">HHS</div>
+      <div>
+        <h1 class="site-title">Hillcrest High School</h1>
+        <p class="site-subtitle">STUDENT ROSTER &amp; LOOKUP</p>
+      </div>
+      <div class="header-spacer"></div>
 
-    <style media="screen">
-      body { background: #ECEFF1; color: rgba(0,0,0,0.87); font-family: Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
-      #message { background: white; max-width: 360px; margin: 100px auto 16px; padding: 32px 24px; border-radius: 3px; }
-      #message h2 { color: #ffa100; font-weight: bold; font-size: 16px; margin: 0 0 8px; }
-      #message h1 { font-size: 22px; font-weight: 300; color: rgba(0,0,0,0.6); margin: 0 0 16px;}
-      #message p { line-height: 140%; margin: 16px 0 24px; font-size: 14px; }
-      #message a { display: block; text-align: center; background: #039be5; text-transform: uppercase; text-decoration: none; color: white; padding: 16px; border-radius: 4px; }
-      #message, #message a { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
-      #load { color: rgba(0,0,0,0.4); text-align: center; font-size: 13px; }
-      @media (max-width: 600px) {
-        body, #message { margin-top: 0; background: white; box-shadow: none; }
-        body { border-top: 16px solid #ffa100; }
-      }
-    </style>
-  </head>
-  <body>
-    <div id="message">
-      <h2>Welcome</h2>
-      <h1>Firebase Hosting Setup Complete</h1>
-      <p>You're seeing this because you've successfully setup Firebase Hosting. Now it's time to go build something extraordinary!</p>
-      <a target="_blank" href="https://firebase.google.com/docs/hosting/">Open Hosting Documentation</a>
+      <!-- Admin auth widget -->
+      <div id="authWidget" class="auth-widget">
+        <button id="authToggleBtn" class="btn btn-ghost btn-on-dark">Admin sign in</button>
+        <div id="authPopover" class="auth-popover is-hidden">
+          <form id="authForm">
+            <label for="authEmail">Email</label>
+            <input type="email" id="authEmail" required autocomplete="username" />
+            <label for="authPassword">Password</label>
+            <input type="password" id="authPassword" required autocomplete="current-password" />
+            <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+            <p id="authError" class="error-text"></p>
+          </form>
+        </div>
+        <span id="adminBadge" class="admin-badge is-hidden"></span>
+        <button id="signOutBtn" class="btn btn-ghost btn-on-dark is-hidden">Sign out</button>
+      </div>
     </div>
-    <p id="load">Firebase SDK Loading&hellip;</p>
+  </header>
 
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const loadEl = document.querySelector('#load');
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
-        // // The Firebase SDK is initialized and available here!
-        //
-        // firebase.auth().onAuthStateChanged(user => { });
-        // firebase.database().ref('/path/to/ref').on('value', snapshot => { });
-        // firebase.firestore().doc('/foo/bar').get().then(() => { });
-        // firebase.functions().httpsCallable('yourFunction')().then(() => { });
-        // firebase.messaging().requestPermission().then(() => { });
-        // firebase.storage().ref('/path/to/ref').getDownloadURL().then(() => { });
-        // firebase.analytics(); // call to activate
-        // firebase.analytics().logEvent('tutorial_completed');
-        // firebase.performance(); // call to activate
-        //
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+  <main class="page">
 
-        try {
-          let app = firebase.app();
-          let features = [
-            'auth', 
-            'database', 
-            'firestore',
-            'functions',
-            'messaging', 
-            'storage', 
-            'analytics', 
-            'remoteConfig',
-            'performance',
-          ].filter(feature => typeof app[feature] === 'function');
-          loadEl.textContent = `Firebase SDK loaded with ${features.join(', ')}`;
-        } catch (e) {
-          console.error(e);
-          loadEl.textContent = 'Error loading the Firebase SDK, check the console.';
-        }
-      });
-    </script>
-  </body>
+    <form id="searchForm" class="control-rail" novalidate>
+      <div class="field-row">
+        <div class="field-grow">
+          <label for="query">Search</label>
+          <input
+            type="text"
+            id="query"
+            name="query"
+            placeholder="Admin number, student name, or class…"
+            autocomplete="off"
+          />
+        </div>
+        <div>
+          <label for="field">Search field</label>
+          <select id="field" name="field">
+            <option value="auto" selected>Auto (admin / name / class)</option>
+            <option value="admin">Admin No</option>
+            <option value="name">Name</option>
+            <option value="class">Registration class</option>
+          </select>
+        </div>
+        <div class="field-row-actions">
+          <button type="submit" class="btn btn-primary">Search</button>
+          <button type="button" id="openFiltersBtn" class="btn btn-ghost">
+            Filters <span id="filterCountBadge" class="filter-count-badge is-hidden">0</span>
+          </button>
+          <button type="button" id="resetBtn" class="btn btn-ghost">Clear all</button>
+        </div>
+      </div>
+
+      <div id="activeFilters" class="active-filters"></div>
+    </form>
+
+    <div class="results-meta">
+      <span id="resultCount">Loading…</span>
+      <div class="layout-toggle" role="group" aria-label="Result layout">
+        <button type="button" class="layout-btn is-active" data-layout="list">List</button>
+        <button type="button" class="layout-btn" data-layout="grid2">Grid · 2</button>
+        <button type="button" class="layout-btn" data-layout="grid3">Grid · 3</button>
+      </div>
+    </div>
+
+    <div id="loadingState" class="loading-state">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>Loading student roster…</span>
+    </div>
+
+    <div id="tableWrap" class="table-wrap is-hidden">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Name</th>
+            <th>Admin No</th>
+            <th>Grade / Class</th>
+            <th>Gender</th>
+            <th>Subjects</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+
+    <div id="cardsWrap" class="cards-wrap is-hidden">
+      <div id="resultsGrid" class="results-grid"></div>
+    </div>
+
+  </main>
+
+  <!-- Filters modal -->
+  <div id="filterScrim" class="scrim"></div>
+  <div id="filterModal" class="modal" role="dialog" aria-label="Filters">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Filters</h2>
+        <button id="filterModalClose" class="drawer-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-grid">
+          <div>
+            <label for="filterGrade">Grade</label>
+            <select id="filterGrade">
+              <option value="">All grades</option>
+              <option value="8">Grade 8</option>
+              <option value="9">Grade 9</option>
+              <option value="10">Grade 10</option>
+              <option value="11">Grade 11</option>
+              <option value="12">Grade 12</option>
+            </select>
+          </div>
+          <div>
+            <label for="filterClass">Class</label>
+            <select id="filterClass">
+              <option value="">All classes</option>
+            </select>
+          </div>
+          <div>
+            <label for="filterGender">Gender</label>
+            <select id="filterGender">
+              <option value="">All</option>
+              <option value="Female">Female</option>
+              <option value="Male">Male</option>
+            </select>
+          </div>
+          <div>
+            <label for="filterSubject">Subject</label>
+            <select id="filterSubject">
+              <option value="">All subjects</option>
+            </select>
+          </div>
+          <div>
+            <label for="filterTeacher">Teacher</label>
+            <select id="filterTeacher" disabled>
+              <option value="">Select a subject first</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="filterClearBtn" class="btn btn-ghost">Clear all</button>
+        <button type="button" id="filterApplyBtn" class="btn btn-primary">Apply filters</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="scrim" class="scrim"></div>
+  <aside id="drawer" class="drawer" aria-label="Student details">
+    <button id="drawerClose" class="drawer-close" aria-label="Close">&times;</button>
+    <div id="drawerHeader" class="drawer-header"></div>
+    <div id="drawerContent"></div>
+  </aside>
+
+  <!-- Env config must load before any module that reads window.APP_CONFIG -->
+  <script src="js/config.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
 </html>

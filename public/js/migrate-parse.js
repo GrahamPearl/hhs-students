@@ -8,7 +8,7 @@
 const REQUIRED_FIELDS = ["adminNo", "firstName", "lastName", "grade", "class"];
 
 /** Deterministic stringify (sorted keys) so field-order differences don't count as changes. */
-function stableStringify(value) {
+export function stableStringify(value) {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
   if (value && typeof value === "object") {
     return `{${Object.keys(value)

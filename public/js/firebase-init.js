@@ -10,6 +10,8 @@ import {
   doc,
   getDoc,
   writeBatch,
+  runTransaction,
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth,
@@ -27,6 +29,8 @@ export {
   doc,
   getDoc,
   writeBatch,
+  runTransaction,
+  serverTimestamp,
   signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,

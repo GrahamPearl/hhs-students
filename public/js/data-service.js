@@ -82,3 +82,29 @@ export function collectClasses(students, grade) {
     .forEach((s) => set.add(s.class));
   return Array.from(set).sort();
 }
+
+/** Distinct, sorted teacher names who teach a given subject. */
+export function collectTeachers(students, subject) {
+  if (!subject) return [];
+  const key = subject.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const set = new Set();
+  students.forEach((s) => {
+    const enr = (s.enrollments || {})[key];
+    if (enr && enr.teacher) set.add(enr.teacher);
+  });
+  return Array.from(set).sort();
+}
+
+/**
+ * Updates one student in the in-memory + sessionStorage cache after a
+ * successful edit, so the table reflects it instantly without an extra
+ * Firestore read. Returns the refreshed array.
+ */
+export function patchCachedStudent(updatedRecord) {
+  if (!memoryCache) return null;
+  memoryCache = memoryCache.map((s) =>
+    String(s.adminNo) === String(updatedRecord.adminNo) ? updatedRecord : s,
+  );
+  writeSessionCache(memoryCache);
+  return memoryCache;
+}

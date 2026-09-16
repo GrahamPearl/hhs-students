@@ -5,13 +5,15 @@
  * and reuse (e.g. from a future admin export tool).
  */
 
+import { subjectKey } from "./edit-form.js";
+
 function normalize(str) {
   return (str || "").toString().trim().toLowerCase();
 }
 
 /**
  * @param {Array} students full roster
- * @param {Object} state { term, field, grade, class, gender, subject }
+ * @param {Object} state { term, field, grade, class, gender, subject, teacher }
  */
 export function filterStudents(students, state) {
   const term = normalize(state.term);
@@ -21,8 +23,14 @@ export function filterStudents(students, state) {
     if (state.grade && String(s.grade) !== String(state.grade)) return false;
     if (state.class && s.class !== state.class) return false;
     if (state.gender && s.gender !== state.gender) return false;
-    if (state.subject && !(s.subjectsSummary || []).includes(state.subject))
-      return false;
+
+    if (state.subject) {
+      if (!(s.subjectsSummary || []).includes(state.subject)) return false;
+      if (state.teacher) {
+        const enr = (s.enrollments || {})[subjectKey(state.subject)];
+        if (!enr || enr.teacher !== state.teacher) return false;
+      }
+    }
 
     if (!terms.length) return true;
 
