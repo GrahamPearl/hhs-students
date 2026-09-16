@@ -3,7 +3,9 @@
  */
 import { getAllStudents, collectSubjects, collectClasses } from "./data-service.js";
 import { filterStudents, sortStudents } from "./search.js";
-import { renderRows, renderResultCount, renderEmptyState, renderDrawerHeader, renderDrawerView } from "./render.js";
+import { renderRows, renderCards, renderEmptyCards, renderResultCount, renderEmptyState, renderDrawerHeader, renderDrawerView } from "./render.js";
+
+let currentLayout = "list";
 
 const els = {
   form: document.getElementById("searchForm"),
@@ -34,6 +36,11 @@ const els = {
   filterApplyBtn: document.getElementById("filterApplyBtn"),
   filterClearBtn: document.getElementById("filterClearBtn"),
   filterCountBadge: document.getElementById("filterCountBadge"),
+
+  tableWrap: document.getElementById("tableWrap"),
+  cardsWrap: document.getElementById("cardsWrap"),
+  resultsGrid: document.getElementById("resultsGrid"),
+  layoutBtns: document.querySelectorAll(".layout-btn"),
 };
 
 const state = () => ({
@@ -53,10 +60,21 @@ let roster = [];
 function runSearch() {
   const results = sortStudents(filterStudents(roster, state()));
   renderResultCount(els.resultCount, results.length, roster.length);
-  if (results.length) {
+
+  if (results.length === 0) {
+    if (currentLayout === "list") {
+      renderEmptyState(els.tbody, COL_COUNT);
+    } else {
+      renderEmptyCards(els.resultsGrid);
+    }
+    return;
+  }
+
+  // Render based on active layout
+  if (currentLayout === "list") {
     renderRows(els.tbody, results);
   } else {
-    renderEmptyState(els.tbody, COL_COUNT);
+    renderCards(els.resultsGrid, results);
   }
 }
 
@@ -209,6 +227,29 @@ function wireEvents() {
     }
     refreshClassOptions();
     runSearch();
+  });
+
+  // Layout toggle buttons handler
+  els.layoutBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      els.layoutBtns.forEach((b) => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
+
+      currentLayout = btn.dataset.layout; // "list", "grid2", or "grid3"
+
+      if (currentLayout === "list") {
+        els.tableWrap.classList.remove("is-hidden");
+        els.cardsWrap.classList.add("is-hidden");
+      } else {
+        els.tableWrap.classList.add("is-hidden");
+        els.cardsWrap.classList.remove("is-hidden");
+
+        // Apply grid column modifier classes if needed
+        els.resultsGrid.className = `results-grid ${currentLayout === "grid3" ? "grid-cols-3" : "grid-cols-2"}`;
+      }
+
+      runSearch();
+    });
   });
 }
 

@@ -65,13 +65,14 @@ export function renderCard(student) {
   card.className = "student-card";
   card.dataset.adminNo = student.adminNo;
   card.innerHTML = `
-    <div class="avatar avatar-card">
+    <div class="avatar avatar-card" style="width: 90px; height: 120px; overflow: hidden; margin: 0 auto;">
       <img src="${photoUrl(student.photo)}" alt=""
            loading="lazy"
+           style="width: 100%; height: 100%; object-fit: cover;"
            onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'avatar-fallback',textContent:'${initials(student)}'}))" />
     </div>
-    <span class="card-name">${student.firstName} ${student.lastName}</span>
-    <span class="card-admin mono">${student.adminNo}</span>
+    <span class="card-name" style="display: block; margin-top: 8px;">${student.firstName} ${student.lastName}</span>
+    <span class="card-admin mono" style="display: block;">${student.adminNo}</span>
   `;
   return card;
 }
