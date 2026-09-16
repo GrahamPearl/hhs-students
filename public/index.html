@@ -17,9 +17,9 @@
       </div>
       <div class="header-spacer"></div>
 
-      <!-- Admin auth widget -->
+      <!-- Admin auth widget: deliberately understated — only staff need it -->
       <div id="authWidget" class="auth-widget">
-        <button id="authToggleBtn" class="btn btn-ghost btn-on-dark">Admin sign in</button>
+        <button id="authToggleBtn" class="staff-link">Staff sign in</button>
         <div id="authPopover" class="auth-popover is-hidden">
           <form id="authForm">
             <label for="authEmail">Email</label>
@@ -31,7 +31,7 @@
           </form>
         </div>
         <span id="adminBadge" class="admin-badge is-hidden"></span>
-        <button id="signOutBtn" class="btn btn-ghost btn-on-dark is-hidden">Sign out</button>
+        <button id="signOutBtn" class="staff-link is-hidden">Sign out</button>
       </div>
     </div>
   </header>
@@ -71,6 +71,57 @@
       <div id="activeFilters" class="active-filters"></div>
     </form>
 
+    <!-- Filter panel: inline, collapsed by default, sits below the search bar -->
+    <section id="filterModal" class="filter-panel is-hidden" aria-label="Filters">
+      <div class="filter-panel-header">
+        <h2 class="modal-title">Filters</h2>
+        <button id="filterModalClose" class="drawer-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-grid">
+        <div>
+          <label for="filterGrade">Grade</label>
+          <select id="filterGrade">
+            <option value="">All grades</option>
+            <option value="8">Grade 8</option>
+            <option value="9">Grade 9</option>
+            <option value="10">Grade 10</option>
+            <option value="11">Grade 11</option>
+            <option value="12">Grade 12</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterClass">Class</label>
+          <select id="filterClass">
+            <option value="">All classes</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterGender">Gender</label>
+          <select id="filterGender">
+            <option value="">All</option>
+            <option value="Female">Female</option>
+            <option value="Male">Male</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterSubject">Subject</label>
+          <select id="filterSubject">
+            <option value="">All subjects</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterTeacher">Teacher</label>
+          <select id="filterTeacher" disabled>
+            <option value="">Select a subject first</option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-panel-footer">
+        <button type="button" id="filterClearBtn" class="btn btn-ghost">Clear all</button>
+        <button type="button" id="filterApplyBtn" class="btn btn-primary">Apply filters</button>
+      </div>
+    </section>
+
     <div class="results-meta">
       <span id="resultCount">Loading…</span>
       <div class="layout-toggle" role="group" aria-label="Result layout">
@@ -106,62 +157,6 @@
     </div>
 
   </main>
-
-  <!-- Filters modal -->
-  <div id="filterScrim" class="scrim"></div>
-  <div id="filterModal" class="modal" role="dialog" aria-label="Filters">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h2 class="modal-title">Filters</h2>
-        <button id="filterModalClose" class="drawer-close" aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="modal-grid">
-          <div>
-            <label for="filterGrade">Grade</label>
-            <select id="filterGrade">
-              <option value="">All grades</option>
-              <option value="8">Grade 8</option>
-              <option value="9">Grade 9</option>
-              <option value="10">Grade 10</option>
-              <option value="11">Grade 11</option>
-              <option value="12">Grade 12</option>
-            </select>
-          </div>
-          <div>
-            <label for="filterClass">Class</label>
-            <select id="filterClass">
-              <option value="">All classes</option>
-            </select>
-          </div>
-          <div>
-            <label for="filterGender">Gender</label>
-            <select id="filterGender">
-              <option value="">All</option>
-              <option value="Female">Female</option>
-              <option value="Male">Male</option>
-            </select>
-          </div>
-          <div>
-            <label for="filterSubject">Subject</label>
-            <select id="filterSubject">
-              <option value="">All subjects</option>
-            </select>
-          </div>
-          <div>
-            <label for="filterTeacher">Teacher</label>
-            <select id="filterTeacher" disabled>
-              <option value="">Select a subject first</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" id="filterClearBtn" class="btn btn-ghost">Clear all</button>
-        <button type="button" id="filterApplyBtn" class="btn btn-primary">Apply filters</button>
-      </div>
-    </div>
-  </div>
 
   <div id="scrim" class="scrim"></div>
   <aside id="drawer" class="drawer" aria-label="Student details">
