@@ -557,7 +557,6 @@ function wireEvents() {
 // Execute Bulk Update Submission
 document.addEventListener("submit", (e) => {
   if (e.target.id === "bulkUpdateForm") {
-    // <--- Corrected ID here
     e.preventDefault();
     const targetField = document.getElementById("bulkTargetField").value;
     const matchVal = document
@@ -570,7 +569,13 @@ document.addEventListener("submit", (e) => {
 
     let updateCount = 0;
 
+    // Import writeBatch and doc from firebase/firestore if not already imported at top of file:
+    // import { writeBatch, doc } from "firebase/firestore";
+    const batch = writeBatch(db); // Assumes 'db' is your initialized Firestore instance
+
     roster.forEach((student) => {
+      let isUpdated = false;
+
       if (targetField === "registrationClass") {
         if (
           String(student.registrationClass || "")
@@ -578,7 +583,7 @@ document.addEventListener("submit", (e) => {
             .toLowerCase() === matchVal
         ) {
           student.registrationClass = newVal;
-          updateCount++;
+          isUpdated = true;
         }
       } else if (targetField === "grade") {
         if (
@@ -587,7 +592,7 @@ document.addEventListener("submit", (e) => {
             .toLowerCase() === matchVal
         ) {
           student.grade = newVal;
-          updateCount++;
+          isUpdated = true;
         }
       } else if (targetField === "subjectTeacher" && subjectScope) {
         const subKey = subjectScope.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -600,7 +605,7 @@ document.addEventListener("submit", (e) => {
               .toLowerCase() === matchVal
           ) {
             enr.teacher = newVal;
-            updateCount++;
+            isUpdated = true;
           }
         }
       } else if (targetField === "subjectLine" && subjectScope) {
@@ -608,11 +613,26 @@ document.addEventListener("submit", (e) => {
         const enr = student.enrollments?.[subKey];
 
         if (enr) {
-          // If you want a strict match filter, uncomment the check below.
-          // Otherwise, this updates all students in the subject scope to the new line.
           enr.line = isNaN(newVal) ? newVal : Number(newVal);
-          updateCount++;
+          isUpdated = true;
         }
+      }
+
+      if (isUpdated) {
+        updateCount++;
+        // Queue the document update for Firestore. 
+        // Note: Make sure student.id holds the correct Firestore document ID string.
+        const studentRef = doc(db, "students", student.id);
+        
+        // We sync the specific updated fields back to Firestore
+        const payload = {};
+        if (targetField === "registrationClass") payload.registrationClass = student.registrationClass;
+        if (targetField === "grade") payload.grade = student.grade;
+        if (targetField === "subjectTeacher" || targetField === "subjectLine") {
+          payload.enrollments = student.enrollments; // Save the modified enrollments map
+        }
+        
+        batch.update(studentRef, payload);
       }
     });
 
@@ -622,9 +642,17 @@ document.addEventListener("submit", (e) => {
       return;
     }
 
-    alert(`Bulk update successful! Updated ${updateCount} student record(s).`);
-    document.getElementById("bulkModalWrapper")?.remove();
-    runSearch(); // Refresh table/grids
+    try {
+      // Commit all changes to Firestore permanently
+      await batch.commit();
+      
+      alert(`Bulk update successful! Updated ${updateCount} student record(s) in Firestore.`);
+      document.getElementById("bulkModalWrapper")?.remove();
+      runSearch(); // Refresh table/grids
+    } catch (err) {
+      console.error("Error committing bulk update to Firestore:", err);
+      errorEl.textContent = "Failed to save updates to database. Check console for details.";
+    }
   }
 });
 
