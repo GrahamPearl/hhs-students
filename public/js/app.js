@@ -15,9 +15,8 @@ import {
   renderEmptyState,
   renderDrawerHeader,
   renderDrawerView,
+  renderDrawerEdit,
 } from "./render.js";
-
-let currentLayout = "list";
 
 const els = {
   form: document.getElementById("searchForm"),
@@ -53,8 +52,14 @@ const els = {
   cardsWrap: document.getElementById("cardsWrap"),
   resultsGrid: document.getElementById("resultsGrid"),
   layoutBtns: document.querySelectorAll(".layout-btn"),
-
   printCardsBtn: document.getElementById("printCardsBtn"),
+
+  authForm: document.getElementById("authForm"),
+  authEmail: document.getElementById("authEmail"),
+  authPassword: document.getElementById("authPassword"),
+  adminBadge: document.getElementById("adminBadge"),
+  signOutBtn: document.getElementById("signOutBtn"),
+  authPopover: document.getElementById("authPopover"),
 };
 
 const state = () => ({
@@ -68,7 +73,10 @@ const state = () => ({
 });
 
 const COL_COUNT = 6;
+let currentLayout = "list";
 let roster = [];
+let isAdmin = false;
+let currentEditingStudent = null; // <-- Declare it here
 
 function runSearch() {
   const results = sortStudents(filterStudents(roster, state()));
@@ -140,8 +148,13 @@ function refreshTeacherOptions() {
 function openDrawer(adminNo) {
   const student = roster.find((s) => String(s.adminNo) === String(adminNo));
   if (!student) return;
+  
+  els.drawer.dataset.activeAdminNo = adminNo;
+
+  // Render the header and pass the isAdmin flag to the view
   els.drawerHeader.innerHTML = renderDrawerHeader(student);
-  els.drawerContent.innerHTML = renderDrawerView(student, false); // Pass true/false for isAdmin if needed
+  els.drawerContent.innerHTML = renderDrawerView(student, isAdmin);
+  
   els.drawer.classList.add("is-open");
   els.scrim.classList.add("is-visible");
   document.body.classList.add("no-scroll");
@@ -313,6 +326,98 @@ function wireEvents() {
     els.printCardsBtn.disabled = false;
 
     window.print();
+  });
+
+  let currentEditingAdminNo = null;
+
+// Inside wireEvents():
+els.drawerContent.addEventListener("click", (e) => {
+  // 1. Click "Edit student" button
+  if (e.target.id === "editStudentBtn") {
+    const adminNo = els.drawer.dataset.activeAdminNo; // or store reference
+    const student = roster.find((s) => String(s.adminNo) === String(adminNo));
+    if (!student) return;
+
+    // Create a working draft copy of the student data
+    currentEditingStudent = JSON.parse(JSON.stringify(student));
+    const allAvailableSubjects = collectSubjects(roster);
+
+    // Render the editable form using renderDrawerEdit from render.js
+    els.drawerContent.innerHTML = renderDrawerEdit(currentEditingStudent, allAvailableSubjects);
+  }
+
+  // 2. Click "Cancel" edit
+  if (e.target.id === "cancelEditBtn") {
+    const student = roster.find((s) => String(s.adminNo) === String(currentEditingStudent.adminNo));
+    els.drawerContent.innerHTML = renderDrawerView(student, isAdmin);
+  }
+
+  // 3. Remove a subject chip in edit mode
+  if (e.target.matches("[data-subject]")) {
+    const subToRemove = e.target.getAttribute("data-subject");
+    currentEditingStudent.subjectsSummary = currentEditingStudent.subjectsSummary.filter(s => s !== subToRemove);
+    const allAvailableSubjects = collectSubjects(roster);
+    els.drawerContent.innerHTML = renderDrawerEdit(currentEditingStudent, allAvailableSubjects);
+  }
+
+  // 4. Add a subject button
+  if (e.target.id === "addSubjectBtn") {
+    const select = document.getElementById("addSubjectSelect");
+    const chosenSub = select.value;
+    if (chosenSub && !currentEditingStudent.subjectsSummary.includes(chosenSub)) {
+      currentEditingStudent.subjectsSummary.push(chosenSub);
+      const allAvailableSubjects = collectSubjects(roster);
+      els.drawerContent.innerHTML = renderDrawerEdit(currentEditingStudent, allAvailableSubjects);
+    }
+  }
+});
+
+// 5. Handle Form Save (Submit)
+els.drawerContent.addEventListener("submit", (e) => {
+  if (e.target.id === "editForm") {
+    e.preventDefault();
+    
+    // Capture input values and update currentEditingStudent draft
+    const inputs = els.drawerContent.querySelectorAll("[data-field]");
+    inputs.forEach(input => {
+      const field = input.getAttribute("data-field");
+      currentEditingStudent[field] = input.value;
+    });
+
+    // Save back to main roster array (or send to Firebase data service)
+    const index = roster.findIndex(s => String(s.adminNo) === String(currentEditingStudent.adminNo));
+    if (index !== -1) {
+      roster[index] = currentEditingStudent;
+    }
+
+    // Return to read-only drawer view & refresh table/cards
+    els.drawerContent.innerHTML = renderDrawerView(currentEditingStudent, isAdmin);
+    runSearch();
+  }
+});
+}
+
+// Handle Staff Sign In
+if (els.authForm) {
+  els.authForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    // In a real Firebase setup, authenticate here. For mockup/session:
+    isAdmin = true;
+    
+    // Update UI indicators
+    els.adminBadge.textContent = `Staff: ${els.authEmail.value}`;
+    els.adminBadge.classList.remove("is-hidden");
+    els.signOutBtn.classList.remove("is-hidden");
+    els.authToggleBtn.classList.add("is-hidden");
+    els.authPopover.classList.add("is-hidden");
+  });
+
+  els.signOutBtn.addEventListener("click", () => {
+    isAdmin = false;
+    els.adminBadge.classList.add("is-hidden");
+    els.signOutBtn.classList.add("is-hidden");
+    els.authToggleBtn.classList.remove("is-hidden");
+    els.authForm.reset();
   });
 }
 
