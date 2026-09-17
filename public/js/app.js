@@ -107,6 +107,27 @@ function populateSelect(select, values, placeholder) {
   if (values.includes(current)) select.value = current;
 }
 
+function getTeachersPerSubjectMap() {
+  const map = {};
+  roster.forEach((student) => {
+    if (student.enrollments) {
+      Object.entries(student.enrollments).forEach(([subKey, enr]) => {
+        if (enr && enr.teacher) {
+          // Normalize or store by subject name if available
+          const subName = enr.subject || subKey;
+          if (!map[subName]) map[subName] = new Set();
+          map[subName].add(enr.teacher);
+        }
+      });
+    }
+  });
+  // Convert sets to sorted arrays
+  Object.keys(map).forEach((sub) => {
+    map[sub] = Array.from(map[sub]).sort();
+  });
+  return map;
+}
+
 function refreshClassOptions() {
   populateSelect(
     els.class,
@@ -331,43 +352,106 @@ function wireEvents() {
   let currentEditingAdminNo = null;
 
 // Inside wireEvents():
+// Inside wireEvents() in app.js:
+els.drawerContent.addEventListener("change", (e) => {
+  // (a) Handling Subject Swap
+  if (e.target.classList.contains("edit-subject-select")) {
+    const oldSub = e.target.getAttribute("data-old-subject");
+    const newSub = e.target.value;
+    const index = parseInt(e.target.closest(".edit-subject-row").dataset.index, 10);
+
+    if (!isNaN(index)) {
+      // Update subjects summary array
+      currentEditingStudent.subjectsSummary[index] = newSub;
+      
+      // Update enrollments mapping
+      const oldKey = oldSub.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const newKey = newSub.toLowerCase().replace(/[^a-z0-9]/g, "");
+      
+      if (currentEditingStudent.enrollments[oldKey]) {
+        currentEditingStudent.enrollments[newKey] = currentEditingStudent.enrollments[oldKey];
+        delete currentEditingStudent.enrollments[oldKey];
+      } else {
+        currentEditingStudent.enrollments[newKey] = { teacher: "", line: 1 };
+      }
+
+      // Re-render the edit form to refresh teacher dropdown options for the new subject
+      const allSubjects = collectSubjects(roster);
+      const teacherMap = getTeachersPerSubjectMap();
+      els.drawerContent.innerHTML = renderDrawerEdit(currentEditingStudent, allSubjects, teacherMap);
+    }
+  }
+
+  // (b) Handling Teacher Swap
+  if (e.target.classList.contains("edit-teacher-select")) {
+    const subKey = e.target.getAttribute("data-subject-key");
+    const newTeacher = e.target.value;
+
+    if (!currentEditingStudent.enrollments[subKey]) {
+      currentEditingStudent.enrollments[subKey] = {};
+    }
+    currentEditingStudent.enrollments[subKey].teacher = newTeacher;
+  }
+
+  // (c) Handling Line Number Change
+  if (e.target.classList.contains("edit-line-input")) {
+    const subKey = e.target.getAttribute("data-subject-key");
+    const newLine = parseInt(e.target.value, 10);
+
+    if (!currentEditingStudent.enrollments[subKey]) {
+      currentEditingStudent.enrollments[subKey] = {};
+    }
+    currentEditingStudent.enrollments[subKey].line = isNaN(newLine) ? "" : newLine;
+  }
+});
+
+// Update click handler inside drawerContent for removing/adding subjects:
 els.drawerContent.addEventListener("click", (e) => {
-  // 1. Click "Edit student" button
   if (e.target.id === "editStudentBtn") {
-    const adminNo = els.drawer.dataset.activeAdminNo; // or store reference
+    const adminNo = els.drawer.dataset.activeAdminNo;
     const student = roster.find((s) => String(s.adminNo) === String(adminNo));
     if (!student) return;
 
-    // Create a working draft copy of the student data
     currentEditingStudent = JSON.parse(JSON.stringify(student));
-    const allAvailableSubjects = collectSubjects(roster);
-
-    // Render the editable form using renderDrawerEdit from render.js
-    els.drawerContent.innerHTML = renderDrawerEdit(currentEditingStudent, allAvailableSubjects);
+    const allSubjects = collectSubjects(roster);
+    const teacherMap = getTeachersPerSubjectMap();
+    els.drawerContent.innerHTML = renderDrawerEdit(currentEditingStudent, allSubjects, teacherMap);
   }
 
-  // 2. Click "Cancel" edit
   if (e.target.id === "cancelEditBtn") {
     const student = roster.find((s) => String(s.adminNo) === String(currentEditingStudent.adminNo));
     els.drawerContent.innerHTML = renderDrawerView(student, isAdmin);
   }
 
-  // 3. Remove a subject chip in edit mode
-  if (e.target.matches("[data-subject]")) {
-    const subToRemove = e.target.getAttribute("data-subject");
+  // Remove a subject row
+  if (e.target.matches("[data-remove-subject]")) {
+    const subToRemove = e.target.getAttribute("data-remove-subject");
     currentEditingStudent.subjectsSummary = currentEditingStudent.subjectsSummary.filter(s => s !== subToRemove);
-    const allAvailableSubjects = collectSubjects(roster);
-    els.drawerContent.innerHTML = renderDrawerEdit(currentEditingStudent, allAvailableSubjects);
+    
+    const subKey = subToRemove.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (currentEditingStudent.enrollments) {
+      delete currentEditingStudent.enrollments[subKey];
+    }
+
+    const allSubjects = collectSubjects(roster);
+    const teacherMap = getTeachersPerSubjectMap();
+    els.drawerContent.innerHTML = renderDrawerEdit(currentEditingStudent, allSubjects, teacherMap);
   }
 
-  // 4. Add a subject button
+  // Add a brand new subject
   if (e.target.id === "addSubjectBtn") {
     const select = document.getElementById("addSubjectSelect");
     const chosenSub = select.value;
     if (chosenSub && !currentEditingStudent.subjectsSummary.includes(chosenSub)) {
       currentEditingStudent.subjectsSummary.push(chosenSub);
-      const allAvailableSubjects = collectSubjects(roster);
-      els.drawerContent.innerHTML = renderDrawerEdit(currentEditingStudent, allAvailableSubjects);
+      
+      const subKey = chosenSub.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (!currentEditingStudent.enrollments) currentEditingStudent.enrollments = {};
+      currentEditingStudent.enrollments[subKey] = { teacher: "", line: currentEditingStudent.subjectsSummary.length };
+
+      const allSubjects = collectSubjects(roster);
+      const teacherMap = getTeachersPerSubjectMap();
+      els.drawerContent.innerHTML = renderDrawerEdit(currentEditingStudent, allSubjects, teacherMap);
     }
   }
 });

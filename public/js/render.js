@@ -147,8 +147,19 @@ export function renderDrawerHeader(student) {
 
 /** Read-only view: facts + subjects table, with an Edit button for admins. */
 export function renderDrawerView(student, isAdmin) {
-  const subjectRows = (student.subjectsSummary || []).length
-    ? student.subjectsSummary
+  const summaries = student.subjectsSummary || [];
+
+  // Sort subjects by line number (Line 1, Line 2, etc.) if enrollment line data exists
+  const sortedSummaries = [...summaries].sort((a, b) => {
+    const keyA = a.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const keyB = b.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const lineA = Number((student.enrollments || {})[keyA]?.line) || 99;
+    const lineB = Number((student.enrollments || {})[keyB]?.line) || 99;
+    return lineA - lineB;
+  });
+
+  const subjectRows = sortedSummaries.length
+    ? sortedSummaries
         .map((name) => {
           const key = name.toLowerCase().replace(/[^a-z0-9]/g, "");
           const enr = (student.enrollments || {})[key];
@@ -156,14 +167,19 @@ export function renderDrawerView(student, isAdmin) {
             <tr>
               <td>${name}</td>
               <td>${enr?.teacher || "—"}</td>
-              <td>${enr?.class || "—"}</td>
+              <td>${enr?.line ?? "—"}</td>
             </tr>`;
         })
         .join("")
     : `<tr><td colspan="3" class="empty-hint">No subjects on file</td></tr>`;
 
   return `
-    ${isAdmin ? `<button id="editStudentBtn" class="btn btn-primary btn-block">Edit student</button>` : ""}
+    ${isAdmin ? `
+      <div class="admin-drawer-actions" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+        <button id="editStudentBtn" class="btn btn-primary btn-block">Edit student</button>
+        <button id="deleteStudentBtn" class="btn btn-danger btn-block" style="background-color: #d9534f; color: white;">Delete student</button>
+      </div>
+    ` : ""}
 
     <dl class="drawer-facts">
       <div><dt>Registration class</dt><dd>${student.registrationClass || "—"}</dd></div>
@@ -174,28 +190,60 @@ export function renderDrawerView(student, isAdmin) {
 
     <h3 class="drawer-subheading">Subjects</h3>
     <table class="drawer-table">
-      <thead><tr><th>Subject</th><th>Teacher</th><th>Class</th></tr></thead>
+      <thead><tr><th>Subject</th><th>Teacher</th><th>Line</th></tr></thead>
       <tbody>${subjectRows}</tbody>
     </table>
   `;
 }
 
 /** Editable form: field inputs + removable subject chips + add-subject row. */
-export function renderDrawerEdit(draft, subjectOptions) {
-  const chips = draft.subjectsSummary.length
+// Helper inside render.js to extract unique teachers for a given subject from global roster if needed, 
+// or you can pass a teacher lookup map. For simplicity, we can generate options dynamically.
+
+export function renderDrawerEdit(draft, subjectOptions, allTeachersBySubject = {}) {
+  const subjectRows = (draft.subjectsSummary || []).length
     ? draft.subjectsSummary
-        .map(
-          (name) => `
-      <span class="chip">
-        ${name}
-        <button type="button" class="chip-remove" data-subject="${name}" aria-label="Remove ${name}">&times;</button>
-      </span>`,
-        )
+        .map((currentSub, index) => {
+          const key = currentSub.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const currentEnr = (draft.enrollments || {})[key] || {};
+          const currentTeacher = currentEnr.teacher || "";
+          const currentLine = currentEnr.line ?? "";
+
+          // Options for swapping the subject
+          const subjectOptionsHtml = subjectOptions
+            .map((s) => `<option value="${s}" ${s === currentSub ? "selected" : ""}>${s}</option>`)
+            .join("");
+
+          // Get teachers available for this specific subject
+          const teachersList = allTeachersBySubject[currentSub] || [currentTeacher].filter(Boolean);
+          const teacherOptionsHtml = teachersList
+            .map((t) => `<option value="${t}" ${t === currentTeacher ? "selected" : ""}>${t}</option>`)
+            .join("");
+
+          return `
+            <div class="edit-subject-row" data-index="${index}" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+              <!-- (a) Swap Subject Dropdown -->
+              <select class="edit-subject-select" data-old-subject="${currentSub}" style="flex: 2;">
+                ${subjectOptionsHtml}
+              </select>
+
+              <!-- (b) Swap Teacher Dropdown -->
+              <select class="edit-teacher-select" data-subject-key="${key}" style="flex: 2;">
+                <option value="">Select teacher...</option>
+                ${teacherOptionsHtml}
+              </select>
+
+              <!-- (c) Change Subject Line Input -->
+              <input type="number" class="edit-line-input" data-subject-key="${key}" value="${currentLine}" min="1" max="10" placeholder="Line" style="width: 70px;" title="Subject Line Number" />
+
+              <button type="button" class="btn btn-ghost btn-sm chip-remove" data-remove-subject="${currentSub}" title="Remove subject">&times;</button>
+            </div>`;
+        })
         .join("")
-    : `<span class="empty-hint">No subjects yet</span>`;
+    : `<p class="empty-hint">No subjects assigned.</p>`;
 
   const availableToAdd = subjectOptions.filter((s) => !draft.subjectsSummary.includes(s));
-  const options = availableToAdd.map((s) => `<option value="${s}">${s}</option>`).join("");
+  const addOptionsHtml = availableToAdd.map((s) => `<option value="${s}">${s}</option>`).join("");
 
   return `
     <form id="editForm" class="edit-form">
@@ -225,28 +273,23 @@ export function renderDrawerEdit(draft, subjectOptions) {
             <option value="Male" ${draft.gender === "Male" ? "selected" : ""}>Male</option>
           </select>
         </div>
-        <div>
-          <label for="editAgegroup">Age group</label>
-          <input id="editAgegroup" data-field="agegroup" type="text" value="${draft.agegroup}" />
-        </div>
-        <div>
-          <label for="editBirthdate">Birthdate</label>
-          <input id="editBirthdate" data-field="birthdate" type="date" value="${draft.birthdate}" />
-        </div>
       </div>
 
-      <h3 class="drawer-subheading">Subjects</h3>
-      <div class="chip-row">${chips}</div>
-      <div class="add-subject-row">
-        <select id="addSubjectSelect">
-          <option value="">Add a subject…</option>
-          ${options}
+      <h3 class="drawer-subheading">Subjects & Teachers</h3>
+      <div class="subjects-edit-container">
+        ${subjectRows}
+      </div>
+
+      <div class="add-subject-row" style="margin-top: 12px; display: flex; gap: 8px;">
+        <select id="addSubjectSelect" style="flex: 1;">
+          <option value="">Add a new subject…</option>
+          ${addOptionsHtml}
         </select>
         <button type="button" id="addSubjectBtn" class="btn btn-ghost" ${availableToAdd.length ? "" : "disabled"}>Add</button>
       </div>
 
       <p id="editError" class="error-text"></p>
-      <div class="edit-actions">
+      <div class="edit-actions" style="margin-top: 16px;">
         <button type="submit" id="saveEditBtn" class="btn btn-primary">Save changes</button>
         <button type="button" id="cancelEditBtn" class="btn btn-ghost">Cancel</button>
       </div>
