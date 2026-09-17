@@ -296,3 +296,91 @@ export function renderDrawerEdit(draft, subjectOptions, allTeachersBySubject = {
     </form>
   `;
 }
+
+export function renderAddStudentForm(step = 1, adminNoValue = "", studentData = {}, subjectOptions = []) {
+  if (step === 1) {
+    return `
+      <form id="addStudentStep1Form" class="edit-form">
+        <h3 class="drawer-subheading">Add New Student: Step 1</h3>
+        <p class="empty-hint">Enter the student's Admin Number to check for existing records.</p>
+        
+        <div style="margin-bottom: 16px;">
+          <label for="newAdminNo">Admin Number</label>
+          <input id="newAdminNo" type="text" value="${adminNoValue}" required autocomplete="off" />
+        </div>
+
+        <p id="step1Error" class="error-text"></p>
+        <div class="edit-actions">
+          <button type="submit" class="btn btn-primary">Check Admin No & Continue</button>
+          <button type="button" id="cancelAddBtn" class="btn btn-ghost">Cancel</button>
+        </div>
+      </form>
+    `;
+  }
+
+  // Step 2: Capture remaining details & subjects
+  const availableSubjectsHtml = subjectOptions
+    .map((s) => `<option value="${s}">${s}</option>`)
+    .join("");
+
+  return `
+    <form id="addStudentStep2Form" class="edit-form">
+      <h3 class="drawer-subheading">Add New Student: Step 2</h3>
+      <p class="drawer-meta">Admin No: <span class="mono"><strong>${adminNoValue}</strong></span></p>
+
+      <div class="edit-grid">
+        <div>
+          <label for="newFirstName">First name</label>
+          <input id="newFirstName" data-field="firstName" type="text" required />
+        </div>
+        <div>
+          <label for="newLastName">Last name</label>
+          <input id="newLastName" data-field="lastName" type="text" required />
+        </div>
+        <div>
+          <label for="newGrade">Grade</label>
+          <select id="newGrade" data-field="grade">
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+          </select>
+        </div>
+        <div>
+          <label for="newClass">Class / Registration Class</label>
+          <input id="newClass" data-field="class" type="text" required />
+        </div>
+        <div>
+          <label for="newGender">Gender</label>
+          <select id="newGender" data-field="gender">
+            <option value="Female">Female</option>
+            <option value="Male">Male</option>
+          </select>
+        </div>
+        <div>
+          <label for="newBirthdate">Birthdate</label>
+          <input id="newBirthdate" data-field="birthdate" type="date" />
+        </div>
+      </div>
+
+      <h3 class="drawer-subheading" style="margin-top: 16px;">Initial Subject Selection</h3>
+      <div class="add-subject-row" style="display: flex; gap: 8px;">
+        <select id="newSubjectSelect" style="flex: 1;">
+          <option value="">Select a subject to add...</option>
+          ${availableSubjectsHtml}
+        </select>
+        <button type="button" id="addNewSubjectBtn" class="btn btn-ghost">Add Subject</button>
+      </div>
+      <div id="newSubjectsList" class="chip-row" style="margin-top: 8px;">
+        <span class="empty-hint">No subjects added yet</span>
+      </div>
+
+      <p id="step2Error" class="error-text"></p>
+      <div class="edit-actions" style="margin-top: 16px;">
+        <button type="submit" class="btn btn-primary">Save New Student</button>
+        <button type="button" id="cancelAddBtn" class="btn btn-ghost">Cancel</button>
+      </div>
+    </form>
+  `;
+}
