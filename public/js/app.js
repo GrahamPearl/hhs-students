@@ -17,6 +17,7 @@ import {
   renderDrawerView,
   renderDrawerEdit,
   renderAddStudentForm,
+  renderBulkUpdateModal,
 } from "./render.js";
 
 const els = {
@@ -27,6 +28,7 @@ const els = {
   class: document.getElementById("filterClass"),
   gender: document.getElementById("filterGender"),
   subject: document.getElementById("filterSubject"),
+  line: document.getElementById("filterLine"),
   teacher: document.getElementById("filterTeacher"), // Added teacher element
   resetBtn: document.getElementById("resetBtn"),
   tbody: document.getElementById("resultsBody"),
@@ -55,6 +57,7 @@ const els = {
   layoutBtns: document.querySelectorAll(".layout-btn"),
   printCardsBtn: document.getElementById("printCardsBtn"),
   addStudentModalBtn: document.getElementById("addStudentModalBtn"),
+  openBulkUpdateBtn: document.getElementById("openBulkUpdateBtn"),
 
   authForm: document.getElementById("authForm"),
   authEmail: document.getElementById("authEmail"),
@@ -71,6 +74,7 @@ const state = () => ({
   class: els.class.value,
   gender: els.gender.value,
   subject: els.subject.value,
+  line: els.line.value,
   teacher: els.teacher.value, // Added teacher state
 });
 
@@ -82,7 +86,19 @@ let currentEditingStudent = null;
 let newStudentDraft = {}; // <-- Declare it here
 
 function runSearch() {
-  const results = sortStudents(filterStudents(roster, state()));
+  let results = sortStudents(filterStudents(roster, state()));
+
+  // Apply Line filtering on top of standard search results
+  const selectedLine = els.line ? els.line.value : "";
+  if (selectedLine) {
+    results = results.filter((student) => {
+      if (!student.enrollments) return false;
+      return Object.values(student.enrollments).some(
+        (enr) => String(enr.line) === String(selectedLine),
+      );
+    });
+  }
+
   renderResultCount(els.resultCount, results.length, roster.length);
 
   if (results.length === 0) {
@@ -100,6 +116,20 @@ function runSearch() {
   } else {
     renderCards(els.resultsGrid, results);
   }
+}
+
+function collectLines(roster) {
+  const lines = new Set();
+  roster.forEach((student) => {
+    if (student.enrollments) {
+      Object.values(student.enrollments).forEach((enr) => {
+        if (enr && enr.line !== undefined && enr.line !== "") {
+          lines.add(Number(enr.line));
+        }
+      });
+    }
+  });
+  return Array.from(lines).sort((a, b) => a - b);
 }
 
 function populateSelect(select, values, placeholder) {
@@ -213,7 +243,7 @@ function wireEvents() {
     runSearch();
   });
 
-  // Listen for changes on the teacher dropdown
+  els.line.addEventListener("change", runSearch);
   els.teacher.addEventListener("change", runSearch);
 
   els.grade.addEventListener("change", () => {
@@ -281,6 +311,9 @@ function wireEvents() {
       els.teacher.disabled = true;
       els.teacher.innerHTML =
         '<option value="">Select a subject first</option>';
+    }
+    if (els.line) {
+      els.line.value = ""; // <--- Reset line filter
     }
     refreshClassOptions();
     runSearch();
@@ -521,6 +554,80 @@ function wireEvents() {
   });
 }
 
+// Execute Bulk Update Submission
+document.addEventListener("submit", (e) => {
+  if (e.target.id === "bulkUpdateForm") {
+    // <--- Corrected ID here
+    e.preventDefault();
+    const targetField = document.getElementById("bulkTargetField").value;
+    const matchVal = document
+      .getElementById("bulkMatchValue")
+      .value.trim()
+      .toLowerCase();
+    const newVal = document.getElementById("bulkNewValue").value.trim();
+    const subjectScope = document.getElementById("bulkSubjectScope")?.value;
+    const errorEl = document.getElementById("bulkUpdateError");
+
+    let updateCount = 0;
+
+    roster.forEach((student) => {
+      if (targetField === "registrationClass") {
+        if (
+          String(student.registrationClass || "")
+            .trim()
+            .toLowerCase() === matchVal
+        ) {
+          student.registrationClass = newVal;
+          updateCount++;
+        }
+      } else if (targetField === "grade") {
+        if (
+          String(student.grade || "")
+            .trim()
+            .toLowerCase() === matchVal
+        ) {
+          student.grade = newVal;
+          updateCount++;
+        }
+      } else if (targetField === "subjectTeacher" && subjectScope) {
+        const subKey = subjectScope.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const enr = student.enrollments?.[subKey];
+
+        if (enr) {
+          if (
+            String(enr.teacher || "")
+              .trim()
+              .toLowerCase() === matchVal
+          ) {
+            enr.teacher = newVal;
+            updateCount++;
+          }
+        }
+      } else if (targetField === "subjectLine" && subjectScope) {
+        const subKey = subjectScope.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const enr = student.enrollments?.[subKey];
+
+        if (enr) {
+          // If you want a strict match filter, uncomment the check below.
+          // Otherwise, this updates all students in the subject scope to the new line.
+          enr.line = isNaN(newVal) ? newVal : Number(newVal);
+          updateCount++;
+        }
+      }
+    });
+
+    if (updateCount === 0) {
+      errorEl.textContent =
+        "No student records matched your filter criteria. Verify current value.";
+      return;
+    }
+
+    alert(`Bulk update successful! Updated ${updateCount} student record(s).`);
+    document.getElementById("bulkModalWrapper")?.remove();
+    runSearch(); // Refresh table/grids
+  }
+});
+
 // Handle Staff Sign In
 if (els.authForm) {
   els.authForm.addEventListener("submit", (e) => {
@@ -533,6 +640,7 @@ if (els.authForm) {
     els.adminBadge.classList.remove("is-hidden");
     els.signOutBtn.classList.remove("is-hidden");
     els.addStudentModalBtn.classList.remove("is-hidden");
+    els.openBulkUpdateBtn.classList.remove("is-hidden");
     els.authToggleBtn.classList.add("is-hidden");
     els.authPopover.classList.add("is-hidden");
   });
@@ -542,6 +650,7 @@ if (els.authForm) {
     els.adminBadge.classList.add("is-hidden");
     els.signOutBtn.classList.add("is-hidden");
     els.addStudentModalBtn.classList.add("is-hidden");
+    els.openBulkUpdateBtn.classList.add("is-hidden");
     els.authToggleBtn.classList.remove("is-hidden");
     els.authForm.reset();
   });
@@ -646,6 +755,44 @@ if (els.authForm) {
       }
     }
   });
+
+  // Open Bulk Update Modal
+  els.openBulkUpdateBtn.addEventListener("click", () => {
+    const modalWrapper = document.createElement("div");
+    modalWrapper.id = "bulkModalWrapper";
+    modalWrapper.innerHTML = renderBulkUpdateModal(
+      collectSubjects(roster),
+      collectClasses(roster),
+    );
+    document.body.appendChild(modalWrapper);
+  });
+
+  // Handle Dynamic Fields and Submission inside the Modal
+  document.addEventListener("change", (e) => {
+    if (e.target.id === "bulkTargetField") {
+      const val = e.target.value;
+      const contextContainer = document.getElementById("bulkContextContainer");
+
+      if (val === "subjectTeacher" || val === "subjectLine") {
+        const subjects = collectSubjects(roster);
+        contextContainer.innerHTML = `
+        <label for="bulkSubjectScope"><strong>Target Subject Scope</strong></label>
+        <select id="bulkSubjectScope" class="form-control" style="width: 100%; margin-top: 4px;" required>
+          <option value="">Select subject...</option>
+          ${subjects.map((s) => `<option value="${s}">${s}</option>`).join("")}
+        </select>
+      `;
+      } else {
+        contextContainer.innerHTML = "";
+      }
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (e.target.id === "closeBulkModalBtn") {
+      document.getElementById("bulkModalWrapper")?.remove();
+    }
+  });
 }
 
 async function init() {
@@ -660,8 +807,9 @@ async function init() {
   }
 
   populateSelect(els.subject, collectSubjects(roster), "All subjects");
+  populateSelect(els.line, collectLines(roster), "All lines"); // <--- Populate line options
   refreshClassOptions();
-  refreshTeacherOptions(); // Initialize teacher dropdown state
+  refreshTeacherOptions();
 
   els.loadingState.remove();
   els.tableWrap.classList.remove("is-hidden");

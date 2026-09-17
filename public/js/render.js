@@ -384,3 +384,51 @@ export function renderAddStudentForm(step = 1, adminNoValue = "", studentData = 
     </form>
   `;
 }
+
+export function renderBulkUpdateModal(subjectsList = [], classesList = []) {
+  return `
+    <div id="bulkUpdateModal" class="modal-overlay" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+      <div class="modal-card" style="background: white; padding: 24px; border-radius: 8px; width: 100%; max-width: 500px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <h3 style="margin-top: 0;">Bulk Data Editor</h3>
+        <p class="empty-hint" style="margin-bottom: 16px;">Perform mass updates across student records securely.</p>
+        
+        <form id="bulkUpdateForm">
+          <!-- 1. Select Field to Update -->
+          <div style="margin-bottom: 12px;">
+            <label for="bulkTargetField"><strong>1. What would you like to change?</strong></label>
+            <select id="bulkTargetField" class="form-control" style="width: 100%; margin-top: 4px;" required>
+              <option value="">Select field to update...</option>
+              <option value="registrationClass">Registration Class</option>
+              <option value="grade">Grade</option>
+              <option value="subjectTeacher">Subject Teacher (Specific Subject)</option>
+              <option value="subjectLine">Subject Line (Specific Subject)</option>
+            </select>
+          </div>
+
+          <!-- Dynamic Context Container (populated via JS depending on field choice) -->
+          <div id="bulkContextContainer" style="margin-bottom: 12px;"></div>
+
+          <!-- 2. Target Filter Criteria -->
+          <div style="margin-bottom: 12px;">
+            <label for="bulkMatchValue"><strong>2. Current Value to Match (Filter)</strong></label>
+            <input id="bulkMatchValue" type="text" class="form-control" placeholder="e.g., Old Teacher Name or Class 10A" style="width: 100%; margin-top: 4px;" required />
+            <small class="empty-hint">Only students matching this current value will be updated.</small>
+          </div>
+
+          <!-- 3. New Replacement Value -->
+          <div style="margin-bottom: 16px;">
+            <label for="bulkNewValue"><strong>3. New Replacement Value</strong></label>
+            <input id="bulkNewValue" type="text" class="form-control" placeholder="e.g., New Teacher Name or Class 10B" style="width: 100%; margin-top: 4px;" required />
+          </div>
+
+          <div id="bulkUpdateError" class="error-text" style="margin-bottom: 12px;"></div>
+
+          <div class="edit-actions" style="display: flex; gap: 8px; justify-content: flex-end;">
+            <button type="submit" class="btn btn-primary">Apply Bulk Update</button>
+            <button type="button" id="closeBulkModalBtn" class="btn btn-ghost">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
