@@ -492,7 +492,7 @@ tbody td {
   gap: 14px;
 }
 .results-grid.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
-.results-grid.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.results-grid.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
 
 .student-card {
   display: flex;
@@ -526,4 +526,44 @@ tbody td {
     grid-template-columns: repeat(2, 1fr);
   }
   .modal-grid { grid-template-columns: 1fr; }
+}
+
+@media print {
+  /* Exclude search form, filter panels, and other non-card UI elements */
+  #searchForm,
+  .control-rail,
+  #filterModal,
+  .filter-panel,
+  .site-header,
+  .results-meta,
+  .drawer,
+  .scrim,
+  #authWidget {
+    display: none !important;
+  }
+
+  /* Ensure only the grid cards print cleanly */
+  .cards-wrap, 
+  .results-grid {
+    display: grid !important;
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .student-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #ccc;
+    padding: 10px;
+    background: #fff;
+  }
+
+  .student-card img {
+    width: 90px !important;
+    height: 120px !important;
+    object-fit: cover !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }

@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Hillcrest High School — Student Lookup</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
+
 <body>
 
   <header class="site-header">
@@ -42,13 +44,8 @@
       <div class="field-row">
         <div class="field-grow">
           <label for="query">Search</label>
-          <input
-            type="text"
-            id="query"
-            name="query"
-            placeholder="Admin number, student name, or class…"
-            autocomplete="off"
-          />
+          <input type="text" id="query" name="query" placeholder="Admin number, student name, or class…"
+            autocomplete="off" />
         </div>
         <div>
           <label for="field">Search field</label>
@@ -124,10 +121,13 @@
 
     <div class="results-meta">
       <span id="resultCount">Loading…</span>
-      <div class="layout-toggle" role="group" aria-label="Result layout">
-        <button type="button" class="layout-btn is-active" data-layout="list">List</button>
-        <button type="button" class="layout-btn" data-layout="grid2">Grid · 2</button>
-        <button type="button" class="layout-btn" data-layout="grid3">Grid · 3</button>
+      <div class="results-actions" style="display: flex; gap: 12px; align-items: center;">
+        <button type="button" id="printCardsBtn" class="btn btn-ghost is-hidden">Print / Export PDF</button>
+        <div class="layout-toggle" role="group" aria-label="Result layout">
+          <button type="button" class="layout-btn is-active" data-layout="list">List</button>
+          <button type="button" class="layout-btn" data-layout="grid2">Grid · 2</button>
+          <button type="button" class="layout-btn" data-layout="grid4">Grid · 4</button>
+        </div>
       </div>
     </div>
 
@@ -169,4 +169,5 @@
   <script src="js/config.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
+
 </html>

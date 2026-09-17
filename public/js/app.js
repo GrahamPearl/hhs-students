@@ -1,9 +1,21 @@
 /**
  * app.js — wires data-service, search, and render together.
  */
-import { getAllStudents, collectSubjects, collectClasses } from "./data-service.js";
+import {
+  getAllStudents,
+  collectSubjects,
+  collectClasses,
+} from "./data-service.js";
 import { filterStudents, sortStudents } from "./search.js";
-import { renderRows, renderCards, renderEmptyCards, renderResultCount, renderEmptyState, renderDrawerHeader, renderDrawerView } from "./render.js";
+import {
+  renderRows,
+  renderCards,
+  renderEmptyCards,
+  renderResultCount,
+  renderEmptyState,
+  renderDrawerHeader,
+  renderDrawerView,
+} from "./render.js";
 
 let currentLayout = "list";
 
@@ -41,6 +53,8 @@ const els = {
   cardsWrap: document.getElementById("cardsWrap"),
   resultsGrid: document.getElementById("resultsGrid"),
   layoutBtns: document.querySelectorAll(".layout-btn"),
+
+  printCardsBtn: document.getElementById("printCardsBtn"),
 };
 
 const state = () => ({
@@ -55,7 +69,6 @@ const state = () => ({
 
 const COL_COUNT = 6;
 let roster = [];
-
 
 function runSearch() {
   const results = sortStudents(filterStudents(roster, state()));
@@ -80,18 +93,23 @@ function runSearch() {
 
 function populateSelect(select, values, placeholder) {
   const current = select.value;
-  select.innerHTML = `<option value="">${placeholder}</option>` +
+  select.innerHTML =
+    `<option value="">${placeholder}</option>` +
     values.map((v) => `<option value="${v}">${v}</option>`).join("");
   if (values.includes(current)) select.value = current;
 }
 
 function refreshClassOptions() {
-  populateSelect(els.class, collectClasses(roster, els.grade.value), "All classes");
+  populateSelect(
+    els.class,
+    collectClasses(roster, els.grade.value),
+    "All classes",
+  );
 }
 
 function refreshTeacherOptions() {
   const selectedSubject = els.subject.value;
-  
+
   if (!selectedSubject) {
     els.teacher.innerHTML = '<option value="">Select a subject first</option>';
     els.teacher.value = "";
@@ -106,7 +124,8 @@ function refreshTeacherOptions() {
   roster.forEach((student) => {
     if (student.enrollments) {
       // Look up enrollment using either the slugified key or the exact subject name
-      const enr = student.enrollments[subjectKey] || student.enrollments[selectedSubject];
+      const enr =
+        student.enrollments[subjectKey] || student.enrollments[selectedSubject];
       if (enr && enr.teacher) {
         teachers.add(enr.teacher);
       }
@@ -150,13 +169,13 @@ function wireEvents() {
   els.query.addEventListener("input", debounce(runSearch, 150));
   els.field.addEventListener("change", runSearch);
   els.gender.addEventListener("change", runSearch);
-  
+
   // Update subject change to refresh teachers and run search
   els.subject.addEventListener("change", () => {
     refreshTeacherOptions();
     runSearch();
   });
-  
+
   // Listen for changes on the teacher dropdown
   els.teacher.addEventListener("change", runSearch);
 
@@ -223,33 +242,42 @@ function wireEvents() {
     if (els.teacher) {
       els.teacher.value = "";
       els.teacher.disabled = true;
-      els.teacher.innerHTML = '<option value="">Select a subject first</option>';
+      els.teacher.innerHTML =
+        '<option value="">Select a subject first</option>';
     }
     refreshClassOptions();
     runSearch();
   });
 
   // Layout toggle buttons handler
+  // Inside wireEvents() or layout toggle logic:
   els.layoutBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       els.layoutBtns.forEach((b) => b.classList.remove("is-active"));
       btn.classList.add("is-active");
 
-      currentLayout = btn.dataset.layout; // "list", "grid2", or "grid3"
+      currentLayout = btn.dataset.layout; // "list", "grid2", or "grid4"
 
       if (currentLayout === "list") {
         els.tableWrap.classList.remove("is-hidden");
         els.cardsWrap.classList.add("is-hidden");
+        els.printCardsBtn.classList.add("is-hidden"); // Hide print button in list view
       } else {
         els.tableWrap.classList.add("is-hidden");
         els.cardsWrap.classList.remove("is-hidden");
+        els.printCardsBtn.classList.remove("is-hidden"); // Show print button in grid views
 
-        // Apply grid column modifier classes if needed
-        els.resultsGrid.className = `results-grid ${currentLayout === "grid3" ? "grid-cols-3" : "grid-cols-2"}`;
+        // Adjust grid columns class for Grid-4
+        els.resultsGrid.className = `results-grid ${currentLayout === "grid4" ? "grid-cols-4" : "grid-cols-2"}`;
       }
 
       runSearch();
     });
+  });
+
+  // Wire the print button action
+  els.printCardsBtn.addEventListener("click", () => {
+    window.print();
   });
 }
 
