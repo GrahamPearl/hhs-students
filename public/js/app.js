@@ -276,7 +276,42 @@ function wireEvents() {
   });
 
   // Wire the print button action
-  els.printCardsBtn.addEventListener("click", () => {
+  els.printCardsBtn.addEventListener("click", async () => {
+    // 1. Find all student card images currently rendered
+    const images = els.resultsGrid.querySelectorAll("img");
+
+    if (images.length === 0) {
+      window.print();
+      return;
+    }
+
+    // 2. Show a brief loading indicator or change button text if desired
+    els.printCardsBtn.textContent = "Preparing PDF...";
+    els.printCardsBtn.disabled = true;
+
+    // 3. Force lazy images to load eagerly and wait for them to load
+    const imageLoadPromises = Array.from(images).map((img) => {
+      img.loading = "eager"; // Force immediate loading
+
+      // If the image is already fully loaded, resolve immediately
+      if (img.complete && img.naturalHeight !== 0) {
+        return Promise.resolve();
+      }
+
+      // Otherwise, wait for the load or error event
+      return new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve; // Resolve on error too so it doesn't hang forever
+      });
+    });
+
+    // Wait until every single photo has finished downloading
+    await Promise.all(imageLoadPromises);
+
+    // 4. Reset button state and open the print dialog
+    els.printCardsBtn.textContent = "Print / Export PDF";
+    els.printCardsBtn.disabled = false;
+
     window.print();
   });
 }
