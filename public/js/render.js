@@ -146,6 +146,7 @@ export function renderDrawerHeader(student) {
 }
 
 /** Read-only view: facts + subjects table, with an Edit button for admins. */
+/*
 export function renderDrawerView(student, isAdmin) {
   const summaries = student.subjectsSummary || [];
 
@@ -179,6 +180,13 @@ export function renderDrawerView(student, isAdmin) {
         <button id="editStudentBtn" class="btn btn-primary btn-block">Edit student</button>
         <button id="deleteStudentBtn" class="btn btn-danger btn-block" style="background-color: #d9534f; color: white;">Delete student</button>
       </div>
+      <!-- Action Buttons -->
+      <div class="drawer-actions" style="margin-top: 20px; display: flex; gap: 8px;">
+        ${isAdmin ? `
+          <button type="button" class="btn btn-primary" id="editStudentBtn">Edit Student</button>
+          <button type="button" class="btn btn-outline" id="openTeamsModalBtn">⚽ Manage Teams</button>
+        ` : ''}
+      </div>
     ` : ""}
 
     <dl class="drawer-facts">
@@ -192,6 +200,158 @@ export function renderDrawerView(student, isAdmin) {
     <table class="drawer-table">
       <thead><tr><th>Subject</th><th>Teacher</th><th>Line</th></tr></thead>
       <tbody>${subjectRows}</tbody>
+    </table>
+  `;
+}
+  */
+
+/**
+ * Formats role titles into clean UI badges (e.g. captain -> Captain).
+ */
+/**
+ * Helper to format role names cleanly (e.g., "vice-captain" -> "Vice-Captain")
+ */
+function formatRoleLabel(role) {
+  if (!role) return "Member";
+  return role
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("-");
+}
+
+/**
+ * Helper to render visual badges for student team roles
+ */
+function renderRoleBadge(role) {
+  if (!role || role.toLowerCase() === "member") return "";
+
+  const formattedRole = formatRoleLabel(role);
+  const normalizedRole = role.toLowerCase();
+
+  // Highlight leadership/captain roles differently from volunteer/other roles
+  let badgeStyle = "background-color: #f1f3f4; color: #5f6368; border: 1px solid #dadce0;";
+
+  if (normalizedRole === "captain" || normalizedRole === "vice-captain") {
+    badgeStyle = "background-color: #e8f0fe; color: #1a73e8; border: 1px solid #aecbfa;";
+  } else if (normalizedRole === "leadership") {
+    badgeStyle = "background-color: #fce8e6; color: #c5221f; border: 1px solid #fad2cf;";
+  } else if (normalizedRole === "volunteer") {
+    badgeStyle = "background-color: #e6f4ea; color: #137333; border: 1px solid #ceead6;";
+  }
+
+  return `
+    <span class="role-badge" style="
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin-left: 6px;
+      ${badgeStyle}
+    ">
+      ${formattedRole}
+    </span>
+  `;
+}
+
+/**
+ * Renders the complete read-only view inside the student drawer,
+ * displaying Basic Info, Enrolled Subjects, and Team Memberships.
+ */
+export function renderDrawerView(student, isAdmin) {
+  // 1. Sort subjects by line number (Line 1, Line 2, etc.)
+  const summaries = student.subjectsSummary || [];
+  const sortedSummaries = [...summaries].sort((a, b) => {
+    const keyA = a.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const keyB = b.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const lineA = Number((student.enrollments || {})[keyA]?.line) || 99;
+    const lineB = Number((student.enrollments || {})[keyB]?.line) || 99;
+    return lineA - lineB;
+  });
+
+  // 2. Build Subject Table Rows
+  const subjectRows = sortedSummaries.length
+    ? sortedSummaries
+        .map((name) => {
+          const key = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const enr = (student.enrollments || {})[key];
+          return `
+            <tr>
+              <td>${name}</td>
+              <td>${enr?.teacher || "—"}</td>
+              <td>${enr?.line ?? "—"}</td>
+            </tr>`;
+        })
+        .join("")
+    : `<tr><td colspan="3" class="empty-hint">No subjects on file</td></tr>`;
+
+  // 3. Build Team Table Rows (Splitting TEAM and GROUP on '||')
+  const teams = Array.isArray(student.teams) ? student.teams : [];
+  const teamRows = teams.length
+    ? teams
+        .map((t) => {
+          const rawTeam = t.teamName || t.team || "";
+          
+          // Split on '||'
+          const parts = rawTeam.split("||").map((s) => s.trim());
+          const teamName = parts[0] || rawTeam || "—";
+          const groupName = parts[1] || t.ageGroup || "—";
+
+          const formattedRole = t.role
+            ? t.role.charAt(0).toUpperCase() + t.role.slice(1)
+            : "Member";
+
+          return `
+            <tr>
+              <td>${teamName}</td>
+              <td>${groupName}</td>
+              <td>${formattedRole}</td>
+            </tr>`;
+        })
+        .join("")
+    : `<tr><td colspan="3" class="empty-hint">No teams on file</td></tr>`;
+
+  return `
+    ${
+      isAdmin
+        ? `
+      <div class="admin-drawer-actions" style="display: flex; gap: 8px; margin-bottom: 16px;">
+        <button type="button" id="editStudentBtn" class="btn btn-primary" style="flex: 1;">Edit Student</button>
+        <button type="button" id="openTeamsModalBtn" class="btn btn-outline" style="flex: 1;">⚽ Manage Teams</button>
+      </div>
+    `
+        : ""
+    }
+
+    <dl class="drawer-facts">
+      <div><dt>Registration class</dt><dd>${student.registrationClass || "—"}</dd></div>
+      <div><dt>Gender</dt><dd>${student.gender || "—"}</dd></div>
+      <div><dt>Age group</dt><dd>${student.agegroup || "—"}</dd></div>
+      <div><dt>Birthdate</dt><dd>${student.birthdate || "—"}</dd></div>
+    </dl>
+
+    <h3 class="drawer-subheading">Subjects</h3>
+    <table class="drawer-table">
+      <thead>
+        <tr>
+          <th>Subject</th>
+          <th>Teacher</th>
+          <th>Line</th>
+        </tr>
+      </thead>
+      <tbody>${subjectRows}</tbody>
+    </table>
+
+    <h3 class="drawer-subheading" style="margin-top: 20px;">Teams & Activities</h3>
+    <table class="drawer-table">
+      <thead>
+        <tr>
+          <th>Team</th>
+          <th>Group</th>
+          <th>Role</th>
+        </tr>
+      </thead>
+      <tbody>${teamRows}</tbody>
     </table>
   `;
 }
@@ -429,6 +589,67 @@ export function renderBulkUpdateModal(subjectsList = [], classesList = []) {
           </div>
         </form>
       </div>
+    </div>
+  `;
+}
+
+/**
+ * Renders a single team editing row for a student.
+ */
+export function renderTeamRow(studentTeam = {}, availableTeams = []) {
+  const selectedTeamName = studentTeam.teamName || "";
+  const selectedAgeGroup = studentTeam.ageGroup || "";
+  const selectedRole = studentTeam.role || "member";
+
+  const roles = ["member", "captain", "vice-captain", "leadership", "volunteer"];
+  const ageGroups = ["U14", "U15", "U16", "U19", "Open", "Junior", "Senior"];
+
+  return `
+    <div class="team-edit-row" style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
+      
+      <!-- Team Name Select -->
+      <div style="flex: 2;">
+        <label style="font-size: 0.75rem; font-weight: 600;">Team</label>
+        <select class="form-control team-select" required style="width: 100%;">
+          <option value="">Select Team...</option>
+          ${availableTeams.map(t => `
+            <option value="${t.id || t.teamName}" ${t.teamName === selectedTeamName ? "selected" : ""}>
+              ${t.teamName}
+            </option>
+          `).join("")}
+        </select>
+      </div>
+
+      <!-- Age Group / Group Select -->
+      <div style="flex: 1;">
+        <label style="font-size: 0.75rem; font-weight: 600;">Group</label>
+        <select class="form-control team-group-select" required style="width: 100%;">
+          <option value="">Select Group...</option>
+          ${ageGroups.map(g => `
+            <option value="${g}" ${g === selectedAgeGroup ? "selected" : ""}>${g}</option>
+          `).join("")}
+        </select>
+      </div>
+
+      <!-- Role Select -->
+      <div style="flex: 1.5;">
+        <label style="font-size: 0.75rem; font-weight: 600;">Role</label>
+        <select class="form-control student-role-select" required style="width: 100%;">
+          ${roles.map(r => `
+            <option value="${r}" ${r === selectedRole ? "selected" : ""}>
+              ${r.charAt(0).toUpperCase() + r.slice(1)}
+            </option>
+          `).join("")}
+        </select>
+      </div>
+
+      <!-- Delete Button -->
+      <div style="margin-top: 18px;">
+        <button type="button" class="btn btn-danger-icon remove-team-row-btn" title="Remove Team">
+          &times;
+        </button>
+      </div>
+
     </div>
   `;
 }

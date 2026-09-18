@@ -70,6 +70,38 @@
       <div id="activeFilters" class="active-filters"></div>
     </form>
 
+    <!-- Student Teams Management Modal -->
+    <div id="studentTeamsModal" class="modal-wrapper is-hidden">
+      <div class="modal-backdrop" id="teamsModalCloseScrim"></div>
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <h3 class="modal-title" id="teamsModalTitle">Manage Student Teams</h3>
+            <p class="modal-subtitle" id="teamsModalSubtitle">Student: -</p>
+          </div>
+          <button type="button" class="btn-close" id="closeTeamsModalBtn">&times;</button>
+        </div>
+
+        <form id="studentTeamsForm">
+          <div class="modal-body" id="teamsListContainer">
+            <!-- Team rows will be dynamically populated here -->
+          </div>
+
+          <div class="modal-actions-bar">
+            <button type="button" class="btn btn-secondary" id="addTeamRowBtn">+ Add Team</button>
+          </div>
+
+          <div class="modal-footer">
+            <p id="teamsModalError" class="error-text" style="color: #dc3545; font-size: 0.85rem;"></p>
+            <div class="btn-group">
+              <button type="button" class="btn btn-outline" id="cancelTeamsModalBtn">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="saveTeamsBtn">Save Changes</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Filter panel: inline, collapsed by default, sits below the search bar -->
     <section id="filterModal" class="filter-panel is-hidden" aria-label="Filters">
       <div class="filter-panel-header">
@@ -163,7 +195,6 @@
     <div id="cardsWrap" class="cards-wrap is-hidden">
       <div id="resultsGrid" class="results-grid"></div>
     </div>
-
   </main>
 
   <div id="scrim" class="scrim"></div>

@@ -35,7 +35,7 @@ import {
   renderDrawerEdit,
   renderAddStudentForm,
   renderBulkUpdateModal,
-  renderTeamRow, // <--- CRITICAL IMPORT FIX
+  renderTeamRow,
 } from "./render.js";
 
 const els = {
@@ -101,7 +101,8 @@ let isAdmin = false;
 let currentEditingStudent = null;
 let newStudentDraft = {};
 let currentTeamsStudentAdminNo = null;
-let allAvailableTeams = [];
+let allAvailableTeams = [];// Populated during init or fetch (e.g. from Firestore 'teams' collection)
+
 
 function runSearch() {
   let results = sortStudents(filterStudents(roster, state()));
@@ -242,43 +243,6 @@ function closeDrawer() {
   els.drawer.classList.remove("is-open");
   els.scrim.classList.remove("is-visible");
   document.body.classList.remove("no-scroll");
-}
-
-function openStudentTeamsModal(adminNo) {
-  const student = roster.find((s) => String(s.adminNo) === String(adminNo));
-  if (!student) return;
-
-  currentTeamsStudentAdminNo = adminNo;
-
-  const subtitleEl = document.getElementById("teamsModalSubtitle");
-  if (subtitleEl) {
-    const displayName = student.fullName || `${student.firstName || ""} ${student.lastName || ""}`.trim();
-    subtitleEl.textContent = `Student: ${displayName} (${adminNo})`;
-  }
-
-  const container = document.getElementById("teamsListContainer");
-  const studentTeams = student.teams || [];
-
-  if (container) {
-    if (studentTeams.length === 0) {
-      container.innerHTML = renderTeamRow({}, allAvailableTeams);
-    } else {
-      container.innerHTML = studentTeams
-        .map((t) => renderTeamRow(t, allAvailableTeams))
-        .join("");
-    }
-  }
-
-  const modal = document.getElementById("studentTeamsModal");
-  if (modal) modal.classList.remove("is-hidden");
-}
-
-function closeStudentTeamsModal() {
-  const modal = document.getElementById("studentTeamsModal");
-  if (modal) modal.classList.add("is-hidden");
-  const errorEl = document.getElementById("teamsModalError");
-  if (errorEl) errorEl.textContent = "";
-  currentTeamsStudentAdminNo = null;
 }
 
 function debounce(fn, ms) {
@@ -428,9 +392,64 @@ function wireEvents() {
     window.print();
   });
 
-  // Combined Drawer Content Click Handler (Edit Student AND Manage Teams)
+  els.drawerContent.addEventListener("change", (e) => {
+    if (e.target.classList.contains("edit-subject-select")) {
+      const oldSub = e.target.getAttribute("data-old-subject");
+      const newSub = e.target.value;
+      const index = parseInt(
+        e.target.closest(".edit-subject-row").dataset.index,
+        10,
+      );
+
+      if (!isNaN(index)) {
+        currentEditingStudent.subjectsSummary[index] = newSub;
+
+        const oldKey = oldSub.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const newKey = newSub.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+        if (currentEditingStudent.enrollments[oldKey]) {
+          currentEditingStudent.enrollments[newKey] =
+            currentEditingStudent.enrollments[oldKey];
+          delete currentEditingStudent.enrollments[oldKey];
+        } else {
+          currentEditingStudent.enrollments[newKey] = { teacher: "", line: 1 };
+        }
+
+        const allSubjects = collectSubjects(roster);
+        const teacherMap = getTeachersPerSubjectMap();
+        els.drawerContent.innerHTML = renderDrawerEdit(
+          currentEditingStudent,
+          allSubjects,
+          teacherMap,
+        );
+      }
+    }
+
+    if (e.target.classList.contains("edit-teacher-select")) {
+      const subKey = e.target.getAttribute("data-subject-key");
+      const newTeacher = e.target.value;
+
+      if (!currentEditingStudent.enrollments[subKey]) {
+        currentEditingStudent.enrollments[subKey] = {};
+      }
+      currentEditingStudent.enrollments[subKey].teacher = newTeacher;
+    }
+
+    if (e.target.classList.contains("edit-line-input")) {
+      const subKey = e.target.getAttribute("data-subject-key");
+      const newLine = parseInt(e.target.value, 10);
+
+      if (!currentEditingStudent.enrollments[subKey]) {
+        currentEditingStudent.enrollments[subKey] = {};
+      }
+      currentEditingStudent.enrollments[subKey].line = isNaN(newLine)
+        ? ""
+        : newLine;
+    }
+  });
+
   els.drawerContent.addEventListener("click", (e) => {
-    if (e.target.id === "editStudentBtn" || e.target.closest("#editStudentBtn")) {
+    if (e.target.id === "editStudentBtn") {
       const adminNo = els.drawer.dataset.activeAdminNo;
       const student = roster.find((s) => String(s.adminNo) === String(adminNo));
       if (!student) return;
@@ -444,13 +463,6 @@ function wireEvents() {
         allSubjects,
         teacherMap,
       );
-    }
-
-    if (e.target.id === "openTeamsModalBtn" || e.target.closest("#openTeamsModalBtn")) {
-      const adminNo = els.drawer.dataset.activeAdminNo;
-      if (adminNo) {
-        openStudentTeamsModal(adminNo);
-      }
     }
 
     if (e.target.id === "cancelEditBtn") {
@@ -507,7 +519,6 @@ function wireEvents() {
     }
   });
 
-  // Drawer Form Edit Submission
   els.drawerContent.addEventListener("submit", async (e) => {
     if (e.target.id === "editForm") {
       e.preventDefault();
@@ -564,17 +575,25 @@ function wireEvents() {
     }
   });
 
-  // Teams Modal Handlers
+  // Listen for "Manage Teams" button clicks inside the Student Drawer
+  els.drawerContent.addEventListener("click", (e) => {
+    if (e.target.id === "openTeamsModalBtn" || e.target.closest("#openTeamsModalBtn")) {
+      const adminNo = els.drawer.dataset.activeAdminNo;
+      if (adminNo) {
+        openStudentTeamsModal(adminNo);
+      }
+    }
+  });
+
+  // Teams Modal Action Handlers
   document.getElementById("addTeamRowBtn")?.addEventListener("click", () => {
     const container = document.getElementById("teamsListContainer");
-    if (container) {
-      container.insertAdjacentHTML("beforeend", renderTeamRow({}, allAvailableTeams));
-    }
+    container.insertAdjacentHTML("beforeend", renderTeamRow({}, allAvailableTeams));
   });
 
   document.getElementById("teamsListContainer")?.addEventListener("click", (e) => {
     if (e.target.classList.contains("remove-team-row-btn")) {
-      e.target.closest(".team-edit-row")?.remove();
+      e.target.closest(".team-edit-row").remove();
     }
   });
 
@@ -582,16 +601,17 @@ function wireEvents() {
   document.getElementById("teamsModalCloseScrim")?.addEventListener("click", closeStudentTeamsModal);
   document.getElementById("cancelTeamsModalBtn")?.addEventListener("click", closeStudentTeamsModal);
 
+  // Submit Teams Modal & Save to Firestore
   document.getElementById("studentTeamsForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     if (!isAdmin) {
-      alert("Unauthorized: Only authenticated staff can modify team memberships.");
+      alert("Unauthorized: You must be signed in as staff to edit teams.");
       return;
     }
 
     const container = document.getElementById("teamsListContainer");
-    const rows = container ? container.querySelectorAll(".team-edit-row") : [];
+    const rows = container.querySelectorAll(".team-edit-row");
     const updatedTeams = [];
 
     rows.forEach((row) => {
@@ -611,6 +631,7 @@ function wireEvents() {
         teams: updatedTeams,
       });
 
+      // Sync back to local roster array
       const index = roster.findIndex(
         (s) => String(s.adminNo) === String(currentTeamsStudentAdminNo)
       );
@@ -619,17 +640,17 @@ function wireEvents() {
       }
 
       closeStudentTeamsModal();
-      runSearch();
-      console.log(`Teams updated successfully for student ${currentTeamsStudentAdminNo}`);
+      runSearch(); // Refresh UI
+      console.log(`Teams updated for student ${currentTeamsStudentAdminNo}`);
     } catch (err) {
-      console.error("Failed to update student teams:", err);
+      console.error("Failed to save student teams:", err);
       const errorEl = document.getElementById("teamsModalError");
       if (errorEl) errorEl.textContent = `Failed to save: ${err.message}`;
     }
   });
 }
 
-// Bulk Update Submission
+// Execute Bulk Update Submission (with 500-item chunking)
 document.addEventListener("submit", async (e) => {
   if (e.target.id === "bulkUpdateForm") {
     e.preventDefault();
@@ -740,6 +761,7 @@ document.addEventListener("submit", async (e) => {
   }
 });
 
+// Dynamic Subject Scope Selector & Modal Close Event Listeners
 document.addEventListener("change", (e) => {
   if (e.target.id === "bulkTargetField") {
     const val = e.target.value;
@@ -766,7 +788,7 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// Add Student Handlers
+// Open Add Student Modal/Drawer on Step 1
 els.addStudentModalBtn.addEventListener("click", () => {
   newStudentDraft = { subjectsSummary: [], enrollments: {} };
   els.drawerHeader.innerHTML = `<div><h2 class="drawer-name">Register New Student</h2></div>`;
@@ -782,6 +804,7 @@ els.addStudentModalBtn.addEventListener("click", () => {
   document.body.classList.add("no-scroll");
 });
 
+// Handle drawer content actions for adding a student
 els.drawerContent.addEventListener("submit", (e) => {
   e.preventDefault();
 
@@ -828,6 +851,7 @@ els.drawerContent.addEventListener("submit", (e) => {
   }
 });
 
+// Handle dynamic interactions inside Step 2 of Add Student (adding subjects/chips)
 els.drawerContent.addEventListener("click", (e) => {
   if (e.target.id === "cancelAddBtn") {
     closeDrawer();
@@ -855,6 +879,7 @@ els.drawerContent.addEventListener("click", (e) => {
   }
 });
 
+// Open Bulk Update Modal
 els.openBulkUpdateBtn.addEventListener("click", () => {
   const modalWrapper = document.createElement("div");
   modalWrapper.id = "bulkModalWrapper";
@@ -865,13 +890,18 @@ els.openBulkUpdateBtn.addEventListener("click", () => {
   document.body.appendChild(modalWrapper);
 });
 
-// Auth Observer
+// Handle Firebase Auth State Observer
+// Handle Firebase Auth State Observer
 onAuthStateChanged(auth, async (user) => {
   if (user) {
-    const isStaffEmail = user.email && user.email.endsWith("@hhs.co.za");
+    // Optional: Restrict admin status to staff email domain or custom claims
+    const isStaffEmail = user.email && user.email.endsWith("@hhs.co.za"); // Adjust domain if needed
+    
+    // Check custom admin claim if using Firebase Admin SDK
     const tokenResult = await user.getIdTokenResult().catch(() => ({ claims: {} }));
     const hasAdminClaim = Boolean(tokenResult.claims?.admin);
 
+    // Grant admin access if staff domain or custom claim matches (or fallback to true for all authenticated users)
     isAdmin = isStaffEmail || hasAdminClaim || true;
 
     if (els.adminBadge) els.adminBadge.textContent = `Staff: ${user.email}`;
@@ -889,11 +919,12 @@ onAuthStateChanged(auth, async (user) => {
     els.openBulkUpdateBtn?.classList.add("is-hidden");
     els.authToggleBtn?.classList.remove("is-hidden");
   }
-  runSearch();
+  runSearch(); // Refresh UI with appropriate view/edit permissions
 });
 
-// Sign-In Form Listener
+// Handle Real Staff Sign In & Sign Out with robust error handling
 const authForm = document.getElementById("authForm");
+
 if (authForm) {
   authForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -902,6 +933,7 @@ if (authForm) {
     const passwordInput = document.getElementById("authPassword");
     const errorEl = document.getElementById("authError") || createAuthErrorElement(authForm);
 
+    // Clear previous error message
     errorEl.textContent = "";
 
     const email = emailInput ? emailInput.value.trim() : "";
@@ -913,12 +945,16 @@ if (authForm) {
     }
 
     try {
+      // Execute real Firebase Authentication
       await signInWithEmailAndPassword(auth, email, password);
+      
+      // Reset form on successful login
       authForm.reset();
       errorEl.textContent = "";
     } catch (err) {
       console.error("Firebase Sign-in error:", err.code, err.message);
 
+      // Display friendly error message based on Firebase error codes
       switch (err.code) {
         case "auth/invalid-credential":
         case "auth/user-not-found":
@@ -929,10 +965,10 @@ if (authForm) {
           errorEl.textContent = "Please enter a valid email address.";
           break;
         case "auth/user-disabled":
-          errorEl.textContent = "This account has been disabled.";
+          errorEl.textContent = "This account has been disabled. Contact an administrator.";
           break;
         case "auth/too-many-requests":
-          errorEl.textContent = "Too many failed attempts. Try again later.";
+          errorEl.textContent = "Too many failed attempts. Please try again later.";
           break;
         default:
           errorEl.textContent = `Sign-in failed: ${err.message}`;
@@ -941,6 +977,7 @@ if (authForm) {
   });
 }
 
+// Helper to render inline error container inside auth form if missing in HTML
 function createAuthErrorElement(formEl) {
   let el = document.getElementById("authError");
   if (!el) {
@@ -955,9 +992,35 @@ function createAuthErrorElement(formEl) {
   return el;
 }
 
+// Sign-Out Action
 const signOutBtn = document.getElementById("signOutBtn");
 if (signOutBtn) {
   signOutBtn.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("Sign-out error:", err);
+    }
+  });
+}
+
+// Handle Real Staff Sign In & Sign Out
+if (els.authForm) {
+  els.authForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = els.authEmail.value.trim();
+    const password = els.authPassword.value.trim();
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      els.authForm.reset();
+    } catch (err) {
+      console.error("Sign-in error:", err);
+      alert(`Sign-in failed: ${err.message}`);
+    }
+  });
+
+  els.signOutBtn.addEventListener("click", async () => {
     try {
       await signOut(auth);
     } catch (err) {
@@ -987,5 +1050,98 @@ async function init() {
   els.tableWrap.classList.remove("is-hidden");
   runSearch();
 }
+
+// Open the Student Teams Modal
+export function openStudentTeamsModal(adminNo) {
+  const student = roster.find(s => String(s.adminNo) === String(adminNo));
+  if (!student) return;
+
+  currentTeamsStudentAdminNo = adminNo;
+
+  document.getElementById("teamsModalSubtitle").textContent = 
+    `Student: ${student.fullName || `${student.firstName}${student.lastName}`} (${adminNo})`;
+  
+  const container = document.getElementById("teamsListContainer");
+  const studentTeams = student.teams || []; // Array of { teamName, ageGroup, role }
+
+  if (studentTeams.length === 0) {
+    container.innerHTML = renderTeamRow({}, allAvailableTeams);
+  } else {
+    container.innerHTML = studentTeams
+      .map(t => renderTeamRow(t, allAvailableTeams))
+      .join("");
+  }
+
+  document.getElementById("studentTeamsModal").classList.remove("is-hidden");
+}
+
+// Close Modal Helper
+function closeStudentTeamsModal() {
+  document.getElementById("studentTeamsModal").classList.add("is-hidden");
+  document.getElementById("teamsModalError").textContent = "";
+  currentTeamsStudentAdminNo = null;
+}
+
+// Wire Event Listeners for the Teams Modal
+document.getElementById("addTeamRowBtn")?.addEventListener("click", () => {
+  const container = document.getElementById("teamsListContainer");
+  container.insertAdjacentHTML("beforeend", renderTeamRow({}, allAvailableTeams));
+});
+
+document.getElementById("teamsListContainer")?.addEventListener("click", (e) => {
+  if (e.target.classList.contains("remove-team-row-btn")) {
+    e.target.closest(".team-edit-row").remove();
+  }
+});
+
+document.getElementById("closeTeamsModalBtn")?.addEventListener("click", closeStudentTeamsModal);
+document.getElementById("teamsModalCloseScrim")?.addEventListener("click", closeStudentTeamsModal);
+document.getElementById("cancelTeamsModalBtn")?.addEventListener("click", closeStudentTeamsModal);
+
+// Submit Form & Update Firestore
+document.getElementById("studentTeamsForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!isAdmin) {
+    alert("Unauthorized: Only authenticated staff can modify team memberships.");
+    return;
+  }
+
+  const container = document.getElementById("teamsListContainer");
+  const rows = container.querySelectorAll(".team-edit-row");
+  const updatedTeams = [];
+
+  rows.forEach(row => {
+    const teamName = row.querySelector(".team-select").value;
+    const ageGroup = row.querySelector(".team-group-select").value;
+    const role = row.querySelector(".student-role-select").value;
+
+    if (teamName) {
+      updatedTeams.push({ teamName, ageGroup, role });
+    }
+  });
+
+  try {
+    const studentRef = doc(db, "students", String(currentTeamsStudentAdminNo));
+
+    // Save updated teams list to the student document
+    await updateDoc(studentRef, {
+      teams: updatedTeams
+    });
+
+    // Sync back to local roster array
+    const studentIndex = roster.findIndex(s => String(s.adminNo) === String(currentTeamsStudentAdminNo));
+    if (studentIndex !== -1) {
+      roster[studentIndex].teams = updatedTeams;
+    }
+
+    closeStudentTeamsModal();
+    runSearch(); // Refresh UI
+    console.log(`Teams updated successfully for student ${currentTeamsStudentAdminNo}`);
+  } catch (err) {
+    console.error("Failed to update student teams:", err);
+    document.getElementById("teamsModalError").textContent = `Failed to save: ${err.message}`;
+  }
+});
 
 init();
