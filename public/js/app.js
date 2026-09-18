@@ -568,10 +568,7 @@ document.addEventListener("submit", async (e) => {
     const errorEl = document.getElementById("bulkUpdateError");
 
     let updateCount = 0;
-
-    // Import writeBatch and doc from firebase/firestore if not already imported at top of file:
-    // import { writeBatch, doc } from "firebase/firestore";
-    const batch = writeBatch(db); // Assumes 'db' is your initialized Firestore instance
+    const batch = writeBatch(db);
 
     roster.forEach((student) => {
       let isUpdated = false;
@@ -619,17 +616,20 @@ document.addEventListener("submit", async (e) => {
       }
 
       if (isUpdated) {
+        const docId = student.id || student.docId;
+        if (!docId) {
+          console.error("Student record is missing a Firestore document ID:", student);
+          return;
+        }
+
         updateCount++;
-        // Queue the document update for Firestore. 
-        // Note: Make sure student.id holds the correct Firestore document ID string.
-        const studentRef = doc(db, "students", student.id);
+        const studentRef = doc(db, "students", docId);
         
-        // We sync the specific updated fields back to Firestore
         const payload = {};
         if (targetField === "registrationClass") payload.registrationClass = student.registrationClass;
         if (targetField === "grade") payload.grade = student.grade;
         if (targetField === "subjectTeacher" || targetField === "subjectLine") {
-          payload.enrollments = student.enrollments; // Save the modified enrollments map
+          payload.enrollments = student.enrollments;
         }
         
         batch.update(studentRef, payload);
@@ -643,12 +643,10 @@ document.addEventListener("submit", async (e) => {
     }
 
     try {
-      // Commit all changes to Firestore permanently
       await batch.commit();
-      
       alert(`Bulk update successful! Updated ${updateCount} student record(s) in Firestore.`);
       document.getElementById("bulkModalWrapper")?.remove();
-      runSearch(); // Refresh table/grids
+      runSearch();
     } catch (err) {
       console.error("Error committing bulk update to Firestore:", err);
       errorEl.textContent = "Failed to save updates to database. Check console for details.";
