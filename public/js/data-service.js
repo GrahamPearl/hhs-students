@@ -40,9 +40,14 @@ function writeSessionCache(students) {
 }
 
 async function fetchFromFirestore() {
-  const snap = await getDocs(collection(db, STUDENTS_COLLECTION));
+  const snapshot = await getDocs(collection(db, "students"));
   const students = [];
-  snap.forEach((docSnap) => students.push(docSnap.data()));
+  snapshot.forEach((doc) => {
+    students.push({
+      id: doc.id,         // <--- THIS IS THE CRITICAL LINE
+      ...doc.data()
+    });
+  });
   return students;
 }
 

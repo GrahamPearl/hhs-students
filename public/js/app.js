@@ -1,12 +1,22 @@
 /**
  * app.js — wires data-service, search, and render together.
  */
+
+import {
+  getFirestore,
+  doc,
+  updateDoc,
+  setDoc,
+} from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
 import {
   getAllStudents,
   collectSubjects,
   collectClasses,
 } from "./data-service.js";
+
 import { filterStudents, sortStudents } from "./search.js";
+
 import {
   renderRows,
   renderCards,
@@ -458,7 +468,11 @@ function wireEvents() {
       const student = roster.find((s) => String(s.adminNo) === String(adminNo));
       if (!student) return;
 
-      currentEditingStudent = JSON.parse(JSON.stringify(student));
+      currentEditingStudent = {
+        id: student.id || student.docId, // <--- Ensure id is explicitly copied over here!
+        ...student,
+      };
+
       const allSubjects = collectSubjects(roster);
       const teacherMap = getTeachersPerSubjectMap();
       els.drawerContent.innerHTML = renderDrawerEdit(
@@ -525,18 +539,50 @@ function wireEvents() {
   });
 
   // 5. Handle Form Save (Submit)
-  els.drawerContent.addEventListener("submit", (e) => {
-    if (e.target.id === "editForm") {
-      e.preventDefault();
+  els.drawerContent.addEventListener("submit", async (e) => {
+  if (e.target.id === "editForm") {
+    e.preventDefault();
 
-      // Capture input values and update currentEditingStudent draft
-      const inputs = els.drawerContent.querySelectorAll("[data-field]");
-      inputs.forEach((input) => {
-        const field = input.getAttribute("data-field");
-        currentEditingStudent[field] = input.value;
+    // Capture input values and update currentEditingStudent draft
+    const inputs = els.drawerContent.querySelectorAll("[data-field]");
+    inputs.forEach((input) => {
+      const field = input.getAttribute("data-field");
+      currentEditingStudent[field] = input.value;
+    });
+
+    // --- AGGRESSIVE ID RECOVERY ---
+    let docId = currentEditingStudent.id || currentEditingStudent.docId;
+
+    if (!docId && currentEditingStudent.adminNo) {
+      const foundInRoster = roster.find(
+        (s) => String(s.adminNo).trim() === String(currentEditingStudent.adminNo).trim()
+      );
+      if (foundInRoster) {
+        docId = foundInRoster.id || foundInRoster.docId;
+        currentEditingStudent.id = docId; // fix it for future actions
+      }
+    }
+    // -----------------------------
+
+    if (!docId) {
+      console.error("Critical: Student object is completely missing a Firestore ID:", currentEditingStudent);
+      alert("Error: Could not find database record ID to save changes. Please try refreshing the roster.");
+      return;
+    }
+
+    try {
+      // Permanently update the student document in Firestore
+      const studentRef = doc(db, "students", docId);
+      
+      await updateDoc(studentRef, {
+        name: currentEditingStudent.name,
+        grade: currentEditingStudent.grade,
+        registrationClass: currentEditingStudent.registrationClass,
+        gender: currentEditingStudent.gender,
+        enrollments: currentEditingStudent.enrollments || {}
       });
 
-      // Save back to main roster array (or send to Firebase data service)
+      // Save back to main local roster array
       const index = roster.findIndex(
         (s) => String(s.adminNo) === String(currentEditingStudent.adminNo),
       );
@@ -550,8 +596,14 @@ function wireEvents() {
         isAdmin,
       );
       runSearch();
+      
+      console.log("Student successfully updated in Firestore!");
+    } catch (err) {
+      console.error("Failed to update student in Firestore:", err);
+      alert("Failed to save changes to the database. Check console for details.");
     }
-  });
+  }
+});
 }
 
 // Execute Bulk Update Submission
@@ -618,20 +670,24 @@ document.addEventListener("submit", async (e) => {
       if (isUpdated) {
         const docId = student.id || student.docId;
         if (!docId) {
-          console.error("Student record is missing a Firestore document ID:", student);
+          console.error(
+            "Student record is missing a Firestore document ID:",
+            student,
+          );
           return;
         }
 
         updateCount++;
         const studentRef = doc(db, "students", docId);
-        
+
         const payload = {};
-        if (targetField === "registrationClass") payload.registrationClass = student.registrationClass;
+        if (targetField === "registrationClass")
+          payload.registrationClass = student.registrationClass;
         if (targetField === "grade") payload.grade = student.grade;
         if (targetField === "subjectTeacher" || targetField === "subjectLine") {
           payload.enrollments = student.enrollments;
         }
-        
+
         batch.update(studentRef, payload);
       }
     });
@@ -644,12 +700,15 @@ document.addEventListener("submit", async (e) => {
 
     try {
       await batch.commit();
-      alert(`Bulk update successful! Updated ${updateCount} student record(s) in Firestore.`);
+      alert(
+        `Bulk update successful! Updated ${updateCount} student record(s) in Firestore.`,
+      );
       document.getElementById("bulkModalWrapper")?.remove();
       runSearch();
     } catch (err) {
       console.error("Error committing bulk update to Firestore:", err);
-      errorEl.textContent = "Failed to save updates to database. Check console for details.";
+      errorEl.textContent =
+        "Failed to save updates to database. Check console for details.";
     }
   }
 });
