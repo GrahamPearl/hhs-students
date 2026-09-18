@@ -3,16 +3,18 @@
  */
 
 import {
-  db,
-  doc,
-  updateDoc,
-  setDoc,
-  writeBatch,
-  auth,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
+    db, 
+    doc,
+    updateDoc, 
+    setDoc, 
+    writeBatch,
+    auth, 
+    signInWithEmailAndPassword, 
+    signOut,
+    onAuthStateChanged 
 } from "./firebase-init.js";
+
+
 
 import {
   getAllStudents,
@@ -44,15 +46,15 @@ const els = {
   gender: document.getElementById("filterGender"),
   subject: document.getElementById("filterSubject"),
   line: document.getElementById("filterLine"),
-  teacher: document.getElementById("filterTeacher"),
+  teacher: document.getElementById("filterTeacher"), // Added teacher element
   resetBtn: document.getElementById("resetBtn"),
   tbody: document.getElementById("resultsBody"),
   resultCount: document.getElementById("resultCount"),
   loadingState: document.getElementById("loadingState"),
   tableWrap: document.getElementById("tableWrap"),
   drawer: document.getElementById("drawer"),
-  drawerHeader: document.getElementById("drawerHeader"),
-  drawerContent: document.getElementById("drawerContent"),
+  drawerHeader: document.getElementById("drawerHeader"), // Make sure this matches index.html
+  drawerContent: document.getElementById("drawerContent"), // Make sure this matches index.html
   drawerClose: document.getElementById("drawerClose"),
   scrim: document.getElementById("scrim"),
   authWidget: document.getElementById("authWidget"),
@@ -66,6 +68,7 @@ const els = {
   filterClearBtn: document.getElementById("filterClearBtn"),
   filterCountBadge: document.getElementById("filterCountBadge"),
 
+  tableWrap: document.getElementById("tableWrap"),
   cardsWrap: document.getElementById("cardsWrap"),
   resultsGrid: document.getElementById("resultsGrid"),
   layoutBtns: document.querySelectorAll(".layout-btn"),
@@ -78,6 +81,7 @@ const els = {
   authPassword: document.getElementById("authPassword"),
   adminBadge: document.getElementById("adminBadge"),
   signOutBtn: document.getElementById("signOutBtn"),
+  authPopover: document.getElementById("authPopover"),
 };
 
 const state = () => ({
@@ -88,7 +92,7 @@ const state = () => ({
   gender: els.gender.value,
   subject: els.subject.value,
   line: els.line.value,
-  teacher: els.teacher.value,
+  teacher: els.teacher.value, // Added teacher state
 });
 
 const COL_COUNT = 6;
@@ -96,11 +100,12 @@ let currentLayout = "list";
 let roster = [];
 let isAdmin = false;
 let currentEditingStudent = null;
-let newStudentDraft = {};
+let newStudentDraft = {}; // <-- Declare it here
 
 function runSearch() {
   let results = sortStudents(filterStudents(roster, state()));
 
+  // Apply Line filtering on top of standard search results
   const selectedLine = els.line ? els.line.value : "";
   if (selectedLine) {
     results = results.filter((student) => {
@@ -122,6 +127,7 @@ function runSearch() {
     return;
   }
 
+  // Render based on active layout
   if (currentLayout === "list") {
     renderRows(els.tbody, results);
   } else {
@@ -157,6 +163,7 @@ function getTeachersPerSubjectMap() {
     if (student.enrollments) {
       Object.entries(student.enrollments).forEach(([subKey, enr]) => {
         if (enr && enr.teacher) {
+          // Normalize or store by subject name if available
           const subName = enr.subject || subKey;
           if (!map[subName]) map[subName] = new Set();
           map[subName].add(enr.teacher);
@@ -164,6 +171,7 @@ function getTeachersPerSubjectMap() {
       });
     }
   });
+  // Convert sets to sorted arrays
   Object.keys(map).forEach((sub) => {
     map[sub] = Array.from(map[sub]).sort();
   });
@@ -188,11 +196,13 @@ function refreshTeacherOptions() {
     return;
   }
 
+  // Generate the slugified key matching render.js logic (e.g., "mathematics" -> "mathematics")
   const subjectKey = selectedSubject.toLowerCase().replace(/[^a-z0-9]/g, "");
   const teachers = new Set();
 
   roster.forEach((student) => {
     if (student.enrollments) {
+      // Look up enrollment using either the slugified key or the exact subject name
       const enr =
         student.enrollments[subjectKey] || student.enrollments[selectedSubject];
       if (enr && enr.teacher) {
@@ -212,6 +222,7 @@ function openDrawer(adminNo) {
 
   els.drawer.dataset.activeAdminNo = adminNo;
 
+  // Render the header and pass the isAdmin flag to the view
   els.drawerHeader.innerHTML = renderDrawerHeader(student);
   els.drawerContent.innerHTML = renderDrawerView(student, isAdmin);
 
@@ -243,6 +254,7 @@ function wireEvents() {
   els.field.addEventListener("change", runSearch);
   els.gender.addEventListener("change", runSearch);
 
+  // Update subject change to refresh teachers and run search
   els.subject.addEventListener("change", () => {
     refreshTeacherOptions();
     runSearch();
@@ -260,7 +272,7 @@ function wireEvents() {
   els.resetBtn.addEventListener("click", () => {
     els.form.reset();
     refreshClassOptions();
-    refreshTeacherOptions();
+    refreshTeacherOptions(); // Reset teacher dropdown state
     runSearch();
   });
 
@@ -274,12 +286,14 @@ function wireEvents() {
     if (e.key === "Escape") closeDrawer();
   });
 
+  // Toggle staff auth popover visibility
   if (els.authToggleBtn && els.authPopover) {
     els.authToggleBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       els.authPopover.classList.toggle("is-hidden");
     });
 
+    // Close the popover when clicking outside of the auth widget
     document.addEventListener("click", (e) => {
       if (els.authWidget && !els.authWidget.contains(e.target)) {
         els.authPopover.classList.add("is-hidden");
@@ -287,19 +301,23 @@ function wireEvents() {
     });
   }
 
+  // Toggle filter panel visibility
   els.openFiltersBtn.addEventListener("click", () => {
     els.filterModal.classList.toggle("is-hidden");
   });
 
+  // Close filter panel via close button
   els.filterModalClose.addEventListener("click", () => {
     els.filterModal.classList.add("is-hidden");
   });
 
+  // Apply filters: run search and hide panel
   els.filterApplyBtn.addEventListener("click", () => {
     els.filterModal.classList.add("is-hidden");
     runSearch();
   });
 
+  // Clear filters inside the modal
   els.filterClearBtn.addEventListener("click", () => {
     els.grade.value = "";
     els.class.value = "";
@@ -312,28 +330,31 @@ function wireEvents() {
         '<option value="">Select a subject first</option>';
     }
     if (els.line) {
-      els.line.value = "";
+      els.line.value = ""; // <--- Reset line filter
     }
     refreshClassOptions();
     runSearch();
   });
 
+  // Layout toggle buttons handler
+  // Inside wireEvents() or layout toggle logic:
   els.layoutBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       els.layoutBtns.forEach((b) => b.classList.remove("is-active"));
       btn.classList.add("is-active");
 
-      currentLayout = btn.dataset.layout;
+      currentLayout = btn.dataset.layout; // "list", "grid2", or "grid4"
 
       if (currentLayout === "list") {
         els.tableWrap.classList.remove("is-hidden");
         els.cardsWrap.classList.add("is-hidden");
-        els.printCardsBtn.classList.add("is-hidden");
+        els.printCardsBtn.classList.add("is-hidden"); // Hide print button in list view
       } else {
         els.tableWrap.classList.add("is-hidden");
         els.cardsWrap.classList.remove("is-hidden");
-        els.printCardsBtn.classList.remove("is-hidden");
+        els.printCardsBtn.classList.remove("is-hidden"); // Show print button in grid views
 
+        // Adjust grid columns class for Grid-4
         els.resultsGrid.className = `results-grid ${currentLayout === "grid4" ? "grid-cols-4" : "grid-cols-2"}`;
       }
 
@@ -341,7 +362,9 @@ function wireEvents() {
     });
   });
 
+  // Wire the print button action
   els.printCardsBtn.addEventListener("click", async () => {
+    // 1. Find all student card images currently rendered
     const images = els.resultsGrid.querySelectorAll("img");
 
     if (images.length === 0) {
@@ -349,31 +372,42 @@ function wireEvents() {
       return;
     }
 
+    // 2. Show a brief loading indicator or change button text if desired
     els.printCardsBtn.textContent = "Preparing PDF...";
     els.printCardsBtn.disabled = true;
 
+    // 3. Force lazy images to load eagerly and wait for them to load
     const imageLoadPromises = Array.from(images).map((img) => {
-      img.loading = "eager";
+      img.loading = "eager"; // Force immediate loading
 
+      // If the image is already fully loaded, resolve immediately
       if (img.complete && img.naturalHeight !== 0) {
         return Promise.resolve();
       }
 
+      // Otherwise, wait for the load or error event
       return new Promise((resolve) => {
         img.onload = resolve;
-        img.onerror = resolve;
+        img.onerror = resolve; // Resolve on error too so it doesn't hang forever
       });
     });
 
+    // Wait until every single photo has finished downloading
     await Promise.all(imageLoadPromises);
 
+    // 4. Reset button state and open the print dialog
     els.printCardsBtn.textContent = "Print / Export PDF";
     els.printCardsBtn.disabled = false;
 
     window.print();
   });
 
+  let currentEditingAdminNo = null;
+
+  // Inside wireEvents():
+  // Inside wireEvents() in app.js:
   els.drawerContent.addEventListener("change", (e) => {
+    // (a) Handling Subject Swap
     if (e.target.classList.contains("edit-subject-select")) {
       const oldSub = e.target.getAttribute("data-old-subject");
       const newSub = e.target.value;
@@ -383,8 +417,10 @@ function wireEvents() {
       );
 
       if (!isNaN(index)) {
+        // Update subjects summary array
         currentEditingStudent.subjectsSummary[index] = newSub;
 
+        // Update enrollments mapping
         const oldKey = oldSub.toLowerCase().replace(/[^a-z0-9]/g, "");
         const newKey = newSub.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -396,6 +432,7 @@ function wireEvents() {
           currentEditingStudent.enrollments[newKey] = { teacher: "", line: 1 };
         }
 
+        // Re-render the edit form to refresh teacher dropdown options for the new subject
         const allSubjects = collectSubjects(roster);
         const teacherMap = getTeachersPerSubjectMap();
         els.drawerContent.innerHTML = renderDrawerEdit(
@@ -406,6 +443,7 @@ function wireEvents() {
       }
     }
 
+    // (b) Handling Teacher Swap
     if (e.target.classList.contains("edit-teacher-select")) {
       const subKey = e.target.getAttribute("data-subject-key");
       const newTeacher = e.target.value;
@@ -416,6 +454,7 @@ function wireEvents() {
       currentEditingStudent.enrollments[subKey].teacher = newTeacher;
     }
 
+    // (c) Handling Line Number Change
     if (e.target.classList.contains("edit-line-input")) {
       const subKey = e.target.getAttribute("data-subject-key");
       const newLine = parseInt(e.target.value, 10);
@@ -429,13 +468,17 @@ function wireEvents() {
     }
   });
 
+  // Update click handler inside drawerContent for removing/adding subjects:
   els.drawerContent.addEventListener("click", (e) => {
     if (e.target.id === "editStudentBtn") {
       const adminNo = els.drawer.dataset.activeAdminNo;
       const student = roster.find((s) => String(s.adminNo) === String(adminNo));
       if (!student) return;
 
-      currentEditingStudent = { ...student };
+      currentEditingStudent = {
+        id: student.id || student.docId, // <--- Ensure id is explicitly copied over here!
+        ...student,
+      };
 
       const allSubjects = collectSubjects(roster);
       const teacherMap = getTeachersPerSubjectMap();
@@ -453,6 +496,7 @@ function wireEvents() {
       els.drawerContent.innerHTML = renderDrawerView(student, isAdmin);
     }
 
+    // Remove a subject row
     if (e.target.matches("[data-remove-subject]")) {
       const subToRemove = e.target.getAttribute("data-remove-subject");
       currentEditingStudent.subjectsSummary =
@@ -472,6 +516,7 @@ function wireEvents() {
       );
     }
 
+    // Add a brand new subject
     if (e.target.id === "addSubjectBtn") {
       const select = document.getElementById("addSubjectSelect");
       const chosenSub = select.value;
@@ -500,15 +545,12 @@ function wireEvents() {
     }
   });
 
+  // 5. Handle Form Save (Submit)
   els.drawerContent.addEventListener("submit", async (e) => {
     if (e.target.id === "editForm") {
       e.preventDefault();
 
-      if (!isAdmin) {
-        alert("Unauthorized: You must be signed in as staff to edit students.");
-        return;
-      }
-
+      // Capture input values and update currentEditingStudent draft
       const inputs = els.drawerContent.querySelectorAll("[data-field]");
       inputs.forEach((input) => {
         const field = input.getAttribute("data-field");
@@ -523,23 +565,26 @@ function wireEvents() {
       }
 
       try {
+        // 1. Permanently update the student document in Firestore using adminNo!
         const studentRef = doc(db, "students", adminNo);
 
         await updateDoc(studentRef, {
-          firstName: currentEditingStudent.firstName || "",
-          lastName: currentEditingStudent.lastName || "",
-          fullName: currentEditingStudent.fullName || "",
+          firstName: currentEditingStudent.firstName,
+          lastName: currentEditingStudent.lastName,
+          fullName: currentEditingStudent.fullName,
           grade: currentEditingStudent.grade,
           registrationClass: currentEditingStudent.registrationClass,
           gender: currentEditingStudent.gender,
           enrollments: currentEditingStudent.enrollments || {},
         });
 
+        // 2. Save back to main local roster array
         const index = roster.findIndex((s) => String(s.adminNo) === adminNo);
         if (index !== -1) {
           roster[index] = currentEditingStudent;
         }
 
+        // 3. Return to read-only drawer view & refresh table/cards
         els.drawerContent.innerHTML = renderDrawerView(
           currentEditingStudent,
           isAdmin,
@@ -557,16 +602,10 @@ function wireEvents() {
   });
 }
 
-// Execute Bulk Update Submission (with 500-item chunking)
+// Execute Bulk Update Submission
 document.addEventListener("submit", async (e) => {
   if (e.target.id === "bulkUpdateForm") {
     e.preventDefault();
-
-    if (!isAdmin) {
-      alert("Unauthorized: You must be signed in as staff to perform bulk updates.");
-      return;
-    }
-
     const targetField = document.getElementById("bulkTargetField").value;
     const matchVal = document
       .getElementById("bulkMatchValue")
@@ -576,7 +615,8 @@ document.addEventListener("submit", async (e) => {
     const subjectScope = document.getElementById("bulkSubjectScope")?.value;
     const errorEl = document.getElementById("bulkUpdateError");
 
-    const updatesToCommit = [];
+    let updateCount = 0;
+    const batch = writeBatch(db);
 
     roster.forEach((student) => {
       let isUpdated = false;
@@ -596,8 +636,7 @@ document.addEventListener("submit", async (e) => {
             .trim()
             .toLowerCase() === matchVal
         ) {
-          const parsedVal = isNaN(newVal) ? newVal : Number(newVal);
-          student.grade = parsedVal;
+          student.grade = newVal;
           isUpdated = true;
         }
       } else if (targetField === "subjectTeacher" && subjectScope) {
@@ -625,6 +664,10 @@ document.addEventListener("submit", async (e) => {
       }
 
       if (isUpdated) {
+        updateCount++;
+
+        // OLD CODE: const docId = student.id || student.docId;
+        // NEW CODE: Use the adminNo directly!
         const adminNo = String(student.adminNo).trim();
         const studentRef = doc(db, "students", adminNo);
 
@@ -636,62 +679,28 @@ document.addEventListener("submit", async (e) => {
           payload.enrollments = student.enrollments;
         }
 
-        updatesToCommit.push({ ref: studentRef, payload });
+        batch.update(studentRef, payload);
       }
     });
 
-    if (updatesToCommit.length === 0) {
+    if (updateCount === 0) {
       errorEl.textContent =
         "No student records matched your filter criteria. Verify current value.";
       return;
     }
 
     try {
-      const BATCH_SIZE = 500;
-      for (let i = 0; i < updatesToCommit.length; i += BATCH_SIZE) {
-        const chunk = updatesToCommit.slice(i, i + BATCH_SIZE);
-        const batch = writeBatch(db);
-        chunk.forEach(({ ref, payload }) => batch.update(ref, payload));
-        await batch.commit();
-      }
-
+      await batch.commit();
       alert(
-        `Bulk update successful! Updated ${updatesToCommit.length} student record(s) in Firestore.`,
+        `Bulk update successful! Updated ${updateCount} student record(s) in Firestore.`,
       );
       document.getElementById("bulkModalWrapper")?.remove();
       runSearch();
     } catch (err) {
       console.error("Error committing bulk update to Firestore:", err);
       errorEl.textContent =
-        `Failed to save updates to database: ${err.message}`;
+        "Failed to save updates to database. Check console for details.";
     }
-  }
-});
-
-// Dynamic Subject Scope Selector & Modal Close Event Listeners
-document.addEventListener("change", (e) => {
-  if (e.target.id === "bulkTargetField") {
-    const val = e.target.value;
-    const contextContainer = document.getElementById("bulkContextContainer");
-
-    if (val === "subjectTeacher" || val === "subjectLine") {
-      const subjects = collectSubjects(roster);
-      contextContainer.innerHTML = `
-        <label for="bulkSubjectScope"><strong>Target Subject Scope</strong></label>
-        <select id="bulkSubjectScope" class="form-control" style="width: 100%; margin-top: 4px;" required>
-          <option value="">Select subject...</option>
-          ${subjects.map((s) => `<option value="${s}">${s}</option>`).join("")}
-        </select>
-      `;
-    } else {
-      contextContainer.innerHTML = "";
-    }
-  }
-});
-
-document.addEventListener("click", (e) => {
-  if (e.target.id === "closeBulkModalBtn") {
-    document.getElementById("bulkModalWrapper")?.remove();
   }
 });
 
@@ -715,6 +724,7 @@ els.addStudentModalBtn.addEventListener("click", () => {
 els.drawerContent.addEventListener("submit", (e) => {
   e.preventDefault();
 
+  // Step 1 Submission: Check Admin Number Uniqueness
   if (e.target.id === "addStudentStep1Form") {
     const adminNoInput = document.getElementById("newAdminNo").value.trim();
     const errorEl = document.getElementById("step1Error");
@@ -724,6 +734,7 @@ els.drawerContent.addEventListener("submit", (e) => {
       return;
     }
 
+    // Check against existing roster data
     const exists = roster.some(
       (s) => String(s.adminNo) === String(adminNoInput),
     );
@@ -732,6 +743,7 @@ els.drawerContent.addEventListener("submit", (e) => {
       return;
     }
 
+    // Unique! Save adminNo and proceed to Step 2
     newStudentDraft.adminNo = adminNoInput;
     const allSubjects = collectSubjects(roster);
     els.drawerContent.innerHTML = renderAddStudentForm(
@@ -742,6 +754,7 @@ els.drawerContent.addEventListener("submit", (e) => {
     );
   }
 
+  // Step 2 Submission: Save Complete Student Record
   if (e.target.id === "addStudentStep2Form") {
     const inputs = els.drawerContent.querySelectorAll("[data-field]");
     inputs.forEach((input) => {
@@ -749,40 +762,15 @@ els.drawerContent.addEventListener("submit", (e) => {
       newStudentDraft[field] = input.value;
     });
 
+    // Default fields if needed
     newStudentDraft.photo = newStudentDraft.photo || "";
 
+    // Add to global roster array
     roster.unshift(newStudentDraft);
 
+    // Close drawer and refresh UI
     closeDrawer();
     runSearch();
-  }
-});
-
-// Handle dynamic interactions inside Step 2 of Add Student (adding subjects/chips)
-els.drawerContent.addEventListener("click", (e) => {
-  if (e.target.id === "cancelAddBtn") {
-    closeDrawer();
-  }
-
-  if (e.target.id === "addNewSubjectBtn") {
-    const select = document.getElementById("newSubjectSelect");
-    const sub = select.value;
-    if (sub && !newStudentDraft.subjectsSummary.includes(sub)) {
-      newStudentDraft.subjectsSummary.push(sub);
-      const subKey = sub.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (!newStudentDraft.enrollments) newStudentDraft.enrollments = {};
-      newStudentDraft.enrollments[subKey] = {
-        teacher: "Unassigned",
-        line: newStudentDraft.subjectsSummary.length,
-      };
-
-      const chipsHtml = newStudentDraft.subjectsSummary
-        .map((s) => `<span class="chip">${s}</span>`)
-        .join("");
-      document.getElementById("newSubjectsList").innerHTML =
-        chipsHtml || `<span class="empty-hint">No subjects added yet</span>`;
-      select.value = "";
-    }
   }
 });
 
@@ -797,7 +785,7 @@ els.openBulkUpdateBtn.addEventListener("click", () => {
   document.body.appendChild(modalWrapper);
 });
 
-// Handle Firebase Auth State Observer
+// Handle Staff Sign In
 onAuthStateChanged(auth, (user) => {
   if (user) {
     isAdmin = true;
@@ -816,10 +804,10 @@ onAuthStateChanged(auth, (user) => {
     els.openBulkUpdateBtn.classList.add("is-hidden");
     els.authToggleBtn.classList.remove("is-hidden");
   }
-  runSearch();
+  runSearch(); // Refresh UI views with appropriate permissions
 });
 
-// Handle Real Staff Sign In & Sign Out
+// Handle Real Staff Sign In
 if (els.authForm) {
   els.authForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -843,6 +831,92 @@ if (els.authForm) {
     }
   });
 }
+/*
+if (els.authForm) {
+  els.authForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    // In a real Firebase setup, authenticate here. For mockup/session:
+    isAdmin = true;
+
+    // Update UI indicators
+    els.adminBadge.textContent = `Staff: ${els.authEmail.value}`;
+    els.adminBadge.classList.remove("is-hidden");
+    els.signOutBtn.classList.remove("is-hidden");
+    els.addStudentModalBtn.classList.remove("is-hidden");
+    els.openBulkUpdateBtn.classList.remove("is-hidden");
+    els.authToggleBtn.classList.add("is-hidden");
+    els.authPopover.classList.add("is-hidden");
+  });
+
+  els.signOutBtn.addEventListener("click", () => {
+    isAdmin = false;
+    els.adminBadge.classList.add("is-hidden");
+    els.signOutBtn.classList.add("is-hidden");
+    els.addStudentModalBtn.classList.add("is-hidden");
+    els.openBulkUpdateBtn.classList.add("is-hidden");
+    els.authToggleBtn.classList.remove("is-hidden");
+    els.authForm.reset();
+  });
+
+  let newStudentDraft = {};
+
+  // Handle dynamic interactions inside Step 2 (adding subjects/chips)
+  els.drawerContent.addEventListener("click", (e) => {
+    if (e.target.id === "cancelAddBtn") {
+      closeDrawer();
+    }
+
+    if (e.target.id === "addNewSubjectBtn") {
+      const select = document.getElementById("newSubjectSelect");
+      const sub = select.value;
+      if (sub && !newStudentDraft.subjectsSummary.includes(sub)) {
+        newStudentDraft.subjectsSummary.push(sub);
+        const subKey = sub.toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (!newStudentDraft.enrollments) newStudentDraft.enrollments = {};
+        newStudentDraft.enrollments[subKey] = {
+          teacher: "Unassigned",
+          line: newStudentDraft.subjectsSummary.length,
+        };
+
+        // Render updated chips
+        const chipsHtml = newStudentDraft.subjectsSummary
+          .map((s) => `<span class="chip">${s}</span>`)
+          .join("");
+        document.getElementById("newSubjectsList").innerHTML =
+          chipsHtml || `<span class="empty-hint">No subjects added yet</span>`;
+        select.value = "";
+      }
+    }
+  });
+
+  // Handle Dynamic Fields and Submission inside the Modal
+  document.addEventListener("change", (e) => {
+    if (e.target.id === "bulkTargetField") {
+      const val = e.target.value;
+      const contextContainer = document.getElementById("bulkContextContainer");
+
+      if (val === "subjectTeacher" || val === "subjectLine") {
+        const subjects = collectSubjects(roster);
+        contextContainer.innerHTML = `
+        <label for="bulkSubjectScope"><strong>Target Subject Scope</strong></label>
+        <select id="bulkSubjectScope" class="form-control" style="width: 100%; margin-top: 4px;" required>
+          <option value="">Select subject...</option>
+          ${subjects.map((s) => `<option value="${s}">${s}</option>`).join("")}
+        </select>
+      `;
+      } else {
+        contextContainer.innerHTML = "";
+      }
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (e.target.id === "closeBulkModalBtn") {
+      document.getElementById("bulkModalWrapper")?.remove();
+    }
+  });
+}
+  */
 
 async function init() {
   wireEvents();
@@ -856,7 +930,7 @@ async function init() {
   }
 
   populateSelect(els.subject, collectSubjects(roster), "All subjects");
-  populateSelect(els.line, collectLines(roster), "All lines");
+  populateSelect(els.line, collectLines(roster), "All lines"); // <--- Populate line options
   refreshClassOptions();
   refreshTeacherOptions();
 
