@@ -555,7 +555,7 @@ function wireEvents() {
 }
 
 // Execute Bulk Update Submission
-document.addEventListener("submit", (e) => {
+document.addEventListener("submit", async (e) => {
   if (e.target.id === "bulkUpdateForm") {
     e.preventDefault();
     const targetField = document.getElementById("bulkTargetField").value;
