@@ -137,11 +137,22 @@ function runSearch() {
 async function loadAvailableTeams() {
   try {
     const snapshot = await getDocs(collection(db, "teams"));
-    allAvailableTeams = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      teamName: doc.data().teamName || doc.id,
-      ...doc.data(),
-    }));
+    allAvailableTeams = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      let teamName = data.teamName || doc.id;
+
+      // Clean fallback if legacy "||" string is retrieved
+      if (teamName.includes("||")) {
+        teamName = teamName.split("||")[0].trim();
+      }
+
+      return {
+        id: doc.id,
+        teamName: teamName,
+        ageGroups: data.ageGroups || {},
+        ...data,
+      };
+    });
   } catch (err) {
     console.error("Failed to load teams list from Firestore:", err);
   }
@@ -572,11 +583,32 @@ function wireEvents() {
     }
   });
 
-  document.getElementById("teamsListContainer")?.addEventListener("click", (e) => {
-    if (e.target.classList.contains("remove-team-row-btn")) {
-      e.target.closest(".team-edit-row")?.remove();
+  document.getElementById("teamsListContainer")?.addEventListener("change", (e) => {
+  if (e.target.classList.contains("team-select")) {
+    const selectedTeamName = e.target.value;
+    const row = e.target.closest(".team-edit-row");
+    const groupSelect = row ? row.querySelector(".team-group-select") : null;
+
+    if (groupSelect) {
+      const selectedTeamObj = allAvailableTeams.find(
+        (t) => t.teamName === selectedTeamName || t.id === selectedTeamName
+      );
+
+      let ageGroups = [];
+      if (selectedTeamObj && selectedTeamObj.ageGroups) {
+        ageGroups = Object.keys(selectedTeamObj.ageGroups);
+      }
+
+      if (ageGroups.length === 0) {
+        ageGroups = ["No Age Group", "U14", "U15", "U16", "U19", "Open", "Junior", "Senior"];
+      }
+
+      groupSelect.innerHTML =
+        '<option value="">Select Group...</option>' +
+        ageGroups.map((g) => `<option value="${g}">${g}</option>`).join("");
     }
-  });
+  }
+});
 
   document.getElementById("closeTeamsModalBtn")?.addEventListener("click", closeStudentTeamsModal);
   document.getElementById("teamsModalCloseScrim")?.addEventListener("click", closeStudentTeamsModal);
@@ -969,7 +1001,9 @@ if (signOutBtn) {
 async function init() {
   wireEvents();
   try {
-    roster = await getAllStudents();
+    let rawRoster = await getAllStudents();
+    roster = rawRoster.filter(student => student && student.adminNo);
+    
     await loadAvailableTeams();
   } catch (err) {
     els.loadingState.innerHTML = `

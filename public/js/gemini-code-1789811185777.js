@@ -68,11 +68,10 @@ export function renderCard(student) {
     <div class="avatar avatar-card" style="width: 90px; height: 120px; overflow: hidden; margin: 0 auto;">
       <img src="${photoUrl(student.photo)}" alt=""
            loading="lazy"
-           style="width: 150%; height: 150%; object-fit: cover;"
+           style="width: 100%; height: 100%; object-fit: cover;"
            onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'avatar-fallback',textContent:'${initials(student)}'}))" />
     </div>
     <span class="card-name" style="display: block; margin-top: 8px;">${student.firstName} ${student.lastName}</span>
-    <span class="card-admin mono" style="display: block;">${student.registrationClass || ""}</span>
     <span class="card-admin mono" style="display: block;">${student.adminNo}</span>
   `;
   return card;
@@ -146,113 +145,13 @@ export function renderDrawerHeader(student) {
   `;
 }
 
-/** Read-only view: facts + subjects table, with an Edit button for admins. */
-/*
-export function renderDrawerView(student, isAdmin) {
-  const summaries = student.subjectsSummary || [];
-
-  // Sort subjects by line number (Line 1, Line 2, etc.) if enrollment line data exists
-  const sortedSummaries = [...summaries].sort((a, b) => {
-    const keyA = a.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const keyB = b.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const lineA = Number((student.enrollments || {})[keyA]?.line) || 99;
-    const lineB = Number((student.enrollments || {})[keyB]?.line) || 99;
-    return lineA - lineB;
-  });
-
-  const subjectRows = sortedSummaries.length
-    ? sortedSummaries
-        .map((name) => {
-          const key = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-          const enr = (student.enrollments || {})[key];
-          return `
-            <tr>
-              <td>${name}</td>
-              <td>${enr?.teacher || "—"}</td>
-              <td>${enr?.line ?? "—"}</td>
-            </tr>`;
-        })
-        .join("")
-    : `<tr><td colspan="3" class="empty-hint">No subjects on file</td></tr>`;
-
-  return `
-    ${isAdmin ? `
-      <div class="admin-drawer-actions" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
-        <button id="editStudentBtn" class="btn btn-primary btn-block">Edit student</button>
-        <button id="deleteStudentBtn" class="btn btn-danger btn-block" style="background-color: #d9534f; color: white;">Delete student</button>
-      </div>
-      <!-- Action Buttons -->
-      <div class="drawer-actions" style="margin-top: 20px; display: flex; gap: 8px;">
-        ${isAdmin ? `
-          <button type="button" class="btn btn-primary" id="editStudentBtn">Edit Student</button>
-          <button type="button" class="btn btn-outline" id="openTeamsModalBtn">⚽ Manage Teams</button>
-        ` : ''}
-      </div>
-    ` : ""}
-
-    <dl class="drawer-facts">
-      <div><dt>Registration class</dt><dd>${student.registrationClass || "—"}</dd></div>
-      <div><dt>Gender</dt><dd>${student.gender || "—"}</dd></div>
-      <div><dt>Age group</dt><dd>${student.agegroup || "—"}</dd></div>
-      <div><dt>Birthdate</dt><dd>${student.birthdate || "—"}</dd></div>
-    </dl>
-
-    <h3 class="drawer-subheading">Subjects</h3>
-    <table class="drawer-table">
-      <thead><tr><th>Subject</th><th>Teacher</th><th>Line</th></tr></thead>
-      <tbody>${subjectRows}</tbody>
-    </table>
-  `;
-}
-  */
-
-/**
- * Formats role titles into clean UI badges (e.g. captain -> Captain).
- */
-/**
- * Helper to format role names cleanly (e.g., "vice-captain" -> "Vice-Captain")
- */
+/** Helper to format role names cleanly (e.g., "vice-captain" -> "Vice-Captain") */
 function formatRoleLabel(role) {
   if (!role) return "Member";
   return role
     .split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join("-");
-}
-
-/**
- * Helper to render visual badges for student team roles
- */
-function renderRoleBadge(role) {
-  if (!role || role.toLowerCase() === "member") return "";
-
-  const formattedRole = formatRoleLabel(role);
-  const normalizedRole = role.toLowerCase();
-
-  // Highlight leadership/captain roles differently from volunteer/other roles
-  let badgeStyle = "background-color: #f1f3f4; color: #5f6368; border: 1px solid #dadce0;";
-
-  if (normalizedRole === "captain" || normalizedRole === "vice-captain") {
-    badgeStyle = "background-color: #e8f0fe; color: #1a73e8; border: 1px solid #aecbfa;";
-  } else if (normalizedRole === "leadership") {
-    badgeStyle = "background-color: #fce8e6; color: #c5221f; border: 1px solid #fad2cf;";
-  } else if (normalizedRole === "volunteer") {
-    badgeStyle = "background-color: #e6f4ea; color: #137333; border: 1px solid #ceead6;";
-  }
-
-  return `
-    <span class="role-badge" style="
-      display: inline-block;
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 12px;
-      margin-left: 6px;
-      ${badgeStyle}
-    ">
-      ${formattedRole}
-    </span>
-  `;
 }
 
 /**
@@ -286,21 +185,22 @@ export function renderDrawerView(student, isAdmin) {
         .join("")
     : `<tr><td colspan="3" class="empty-hint">No subjects on file</td></tr>`;
 
-  // 3. Build Team Table Rows (Splitting TEAM and GROUP on '||')
+  // 3. Build Team Table Rows (using structured teamName, ageGroup, and role)
   const teams = Array.isArray(student.teams) ? student.teams : [];
   const teamRows = teams.length
     ? teams
         .map((t) => {
-          const rawTeam = t.teamName || t.team || "";
+          let rawTeam = t.teamName || t.team || "";
           
-          // Split on '||'
-          const parts = rawTeam.split("||").map((s) => s.trim());
-          const teamName = parts[0] || rawTeam || "—";
-          const groupName = parts[1] || t.ageGroup || "—";
+          // Legacy support for string containing '||' if present
+          if (rawTeam.includes("||")) {
+            const parts = rawTeam.split("||").map((s) => s.trim());
+            rawTeam = parts[0];
+          }
 
-          const formattedRole = t.role
-            ? t.role.charAt(0).toUpperCase() + t.role.slice(1)
-            : "Member";
+          const teamName = rawTeam || "—";
+          const groupName = t.ageGroup || "No Age Group";
+          const formattedRole = formatRoleLabel(t.role);
 
           return `
             <tr>
@@ -356,10 +256,6 @@ export function renderDrawerView(student, isAdmin) {
     </table>
   `;
 }
-
-/** Editable form: field inputs + removable subject chips + add-subject row. */
-// Helper inside render.js to extract unique teachers for a given subject from global roster if needed, 
-// or you can pass a teacher lookup map. For simplicity, we can generate options dynamically.
 
 export function renderDrawerEdit(draft, subjectOptions, allTeachersBySubject = {}) {
   const subjectRows = (draft.subjectsSummary || []).length
@@ -479,7 +375,6 @@ export function renderAddStudentForm(step = 1, adminNoValue = "", studentData = 
     `;
   }
 
-  // Step 2: Capture remaining details & subjects
   const availableSubjectsHtml = subjectOptions
     .map((s) => `<option value="${s}">${s}</option>`)
     .join("");
@@ -554,7 +449,6 @@ export function renderBulkUpdateModal(subjectsList = [], classesList = []) {
         <p class="empty-hint" style="margin-bottom: 16px;">Perform mass updates across student records securely.</p>
         
         <form id="bulkUpdateForm">
-          <!-- 1. Select Field to Update -->
           <div style="margin-bottom: 12px;">
             <label for="bulkTargetField"><strong>1. What would you like to change?</strong></label>
             <select id="bulkTargetField" class="form-control" style="width: 100%; margin-top: 4px;" required>
@@ -566,17 +460,14 @@ export function renderBulkUpdateModal(subjectsList = [], classesList = []) {
             </select>
           </div>
 
-          <!-- Dynamic Context Container (populated via JS depending on field choice) -->
           <div id="bulkContextContainer" style="margin-bottom: 12px;"></div>
 
-          <!-- 2. Target Filter Criteria -->
           <div style="margin-bottom: 12px;">
             <label for="bulkMatchValue"><strong>2. Current Value to Match (Filter)</strong></label>
             <input id="bulkMatchValue" type="text" class="form-control" placeholder="e.g., Old Teacher Name or Class 10A" style="width: 100%; margin-top: 4px;" required />
             <small class="empty-hint">Only students matching this current value will be updated.</small>
           </div>
 
-          <!-- 3. New Replacement Value -->
           <div style="margin-bottom: 16px;">
             <label for="bulkNewValue"><strong>3. New Replacement Value</strong></label>
             <input id="bulkNewValue" type="text" class="form-control" placeholder="e.g., New Teacher Name or Class 10B" style="width: 100%; margin-top: 4px;" required />
@@ -596,6 +487,7 @@ export function renderBulkUpdateModal(subjectsList = [], classesList = []) {
 
 /**
  * Renders a single team editing row for a student.
+ * Dynamically computes age groups for the selected team from Firestore data.
  */
 export function renderTeamRow(studentTeam = {}, availableTeams = []) {
   const selectedTeamName = studentTeam.teamName || "";
@@ -603,7 +495,32 @@ export function renderTeamRow(studentTeam = {}, availableTeams = []) {
   const selectedRole = studentTeam.role || "member";
 
   const roles = ["member", "captain", "vice-captain", "leadership", "volunteer"];
-  const ageGroups = ["1st", "2nd", "Grade 8", "Grade 9", "Grade 9", "Grade 10", "Grade 11", "Grade 12", "U14", "U15", "U16", "U17", "U18", "U19", "Open", "Junior", "Senior"];
+
+  // Find selected team document from availableTeams
+  const currentTeamObj = availableTeams.find(
+    (t) => t.teamName === selectedTeamName || t.id === selectedTeamName
+  );
+
+  // Extract available age groups from the selected team's ageGroups object or fallback to unique list
+  let availableAgeGroups = [];
+  if (currentTeamObj && currentTeamObj.ageGroups) {
+    availableAgeGroups = Object.keys(currentTeamObj.ageGroups);
+  } else {
+    // Fallback: gather all age groups across all loaded teams
+    const groupSet = new Set();
+    availableTeams.forEach((t) => {
+      if (t.ageGroups) {
+        Object.keys(t.ageGroups).forEach((g) => groupSet.add(g));
+      } else if (t.ageGroup) {
+        groupSet.add(t.ageGroup);
+      }
+    });
+    availableAgeGroups = Array.from(groupSet);
+  }
+
+  if (availableAgeGroups.length === 0) {
+    availableAgeGroups = ["No Age Group", "U14", "U15", "U16", "U19", "Open", "Junior", "Senior"];
+  }
 
   return `
     <div class="team-edit-row" style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
@@ -613,11 +530,17 @@ export function renderTeamRow(studentTeam = {}, availableTeams = []) {
         <label style="font-size: 0.75rem; font-weight: 600;">Team</label>
         <select class="form-control team-select" required style="width: 100%;">
           <option value="">Select Team...</option>
-          ${availableTeams.map(t => `
-            <option value="${t.id || t.teamName}" ${t.teamName === selectedTeamName ? "selected" : ""}>
-              ${t.teamName}
+          ${availableTeams
+            .map(
+              (t) => `
+            <option value="${t.teamName \vert{}\vert{} t.id}" ${
+                t.teamName === selectedTeamName || t.id === selectedTeamName ? "selected" : ""
+              }>
+              ${t.teamName || t.id}
             </option>
-          `).join("")}
+          `
+            )
+            .join("")}
         </select>
       </div>
 
@@ -626,9 +549,13 @@ export function renderTeamRow(studentTeam = {}, availableTeams = []) {
         <label style="font-size: 0.75rem; font-weight: 600;">Group</label>
         <select class="form-control team-group-select" required style="width: 100%;">
           <option value="">Select Group...</option>
-          ${ageGroups.map(g => `
+          ${availableAgeGroups
+            .map(
+              (g) => `
             <option value="${g}" ${g === selectedAgeGroup ? "selected" : ""}>${g}</option>
-          `).join("")}
+          `
+            )
+            .join("")}
         </select>
       </div>
 
@@ -636,11 +563,15 @@ export function renderTeamRow(studentTeam = {}, availableTeams = []) {
       <div style="flex: 1.5;">
         <label style="font-size: 0.75rem; font-weight: 600;">Role</label>
         <select class="form-control student-role-select" required style="width: 100%;">
-          ${roles.map(r => `
+          ${roles
+            .map(
+              (r) => `
             <option value="${r}" ${r === selectedRole ? "selected" : ""}>
               ${r.charAt(0).toUpperCase() + r.slice(1)}
             </option>
-          `).join("")}
+          `
+            )
+            .join("")}
         </select>
       </div>
 
