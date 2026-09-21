@@ -32,6 +32,25 @@ export function filterStudents(students, state) {
       }
     }
 
+    // --- NEW: Team & Age Group Filter ---
+    if (state.team) {
+      const studentTeams = s.teams || [];
+      const isRegisteredInTeam = studentTeams.some((t) => {
+        // Compare against teamName or team ID
+        const teamMatches = t.teamName === state.team || t.id === state.team;
+
+        // If an age group is specified, both team AND age group must match
+        if (state.ageGroup) {
+          return teamMatches && String(t.ageGroup) === String(state.ageGroup);
+        }
+
+        return teamMatches;
+      });
+
+      if (!isRegisteredInTeam) return false;
+    }
+    // -------------------------------------
+
     if (!terms.length) return true;
 
     if (state.field === "admin") {
@@ -39,18 +58,24 @@ export function filterStudents(students, state) {
     }
 
     if (state.field === "class") {
-      return normalize(s.registrationClass).includes(term) ||
-        normalize(s.class).includes(term);
+      return (
+        normalize(s.registrationClass).includes(term) ||
+        normalize(s.class).includes(term)
+      );
     }
 
     if (state.field === "name") {
-      return terms.every((t) => (s.searchTokens || []).some((tok) => tok.includes(t)));
+      return terms.every((t) =>
+        (s.searchTokens || []).some((tok) => tok.includes(t))
+      );
     }
 
     // auto: admin exact OR every typed word matches some search token
     return (
       normalize(s.adminNo) === term ||
-      terms.every((t) => (s.searchTokens || []).some((tok) => tok.includes(t)))
+      terms.every((t) =>
+        (s.searchTokens || []).some((tok) => tok.includes(t))
+      )
     );
   });
 }

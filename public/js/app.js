@@ -68,6 +68,8 @@ const els = {
   filterApplyBtn: document.getElementById("filterApplyBtn"),
   filterClearBtn: document.getElementById("filterClearBtn"),
   filterCountBadge: document.getElementById("filterCountBadge"),
+  team: document.getElementById("filterTeam"),
+  ageGroup: document.getElementById("filterAgeGroup"),
 
   cardsWrap: document.getElementById("cardsWrap"),
   resultsGrid: document.getElementById("resultsGrid"),
@@ -92,6 +94,8 @@ const state = () => ({
   subject: els.subject.value,
   line: els.line.value,
   teacher: els.teacher.value,
+  team: els.team ? els.team.value : "",
+  ageGroup: els.ageGroup ? els.ageGroup.value : "",
 });
 
 const COL_COUNT = 6;
@@ -153,9 +157,46 @@ async function loadAvailableTeams() {
         ...data,
       };
     });
+
+    // --- ADD THIS CALL TO POPULATE THE FILTER SELECT ---
+    populateTeamFilterOptions();
   } catch (err) {
     console.error("Failed to load teams list from Firestore:", err);
   }
+}
+
+function populateTeamFilterOptions() {
+  if (!els.team) return;
+  const teamNames = allAvailableTeams.map((t) => t.teamName).sort();
+  populateSelect(els.team, teamNames, "All teams");
+}
+
+function refreshAgeGroupOptions() {
+  if (!els.team || !els.ageGroup) return;
+
+  const selectedTeamName = els.team.value;
+  if (!selectedTeamName) {
+    els.ageGroup.innerHTML = '<option value="">Select a team first</option>';
+    els.ageGroup.value = "";
+    els.ageGroup.disabled = true;
+    return;
+  }
+
+  const teamObj = allAvailableTeams.find(
+    (t) => t.teamName === selectedTeamName || t.id === selectedTeamName
+  );
+
+  let groups = [];
+  if (teamObj && teamObj.ageGroups) {
+    groups = Object.keys(teamObj.ageGroups);
+  }
+
+  if (groups.length === 0) {
+    groups = ["U14", "U15", "U16", "U19", "Open", "Junior", "Senior"];
+  }
+
+  populateSelect(els.ageGroup, groups.sort(), "All age groups");
+  els.ageGroup.disabled = false;
 }
 
 function collectLines(roster) {
@@ -658,6 +699,38 @@ function wireEvents() {
       const errorEl = document.getElementById("teamsModalError");
       if (errorEl) errorEl.textContent = `Failed to save: ${err.message}`;
     }
+  });
+
+  els.team.addEventListener("change", () => {
+    refreshAgeGroupOptions();
+    runSearch();
+  });
+
+  els.ageGroup.addEventListener("change", runSearch);
+
+  // Update "Clear All" filter listener
+  els.filterClearBtn.addEventListener("click", () => {
+    els.grade.value = "";
+    els.class.value = "";
+    els.gender.value = "";
+    els.subject.value = "";
+    if (els.teacher) {
+      els.teacher.value = "";
+      els.teacher.disabled = true;
+      els.teacher.innerHTML = '<option value="">Select a subject first</option>';
+    }
+    if (els.line) els.line.value = "";
+
+    // Clear Team & Age Group
+    if (els.team) els.team.value = "";
+    if (els.ageGroup) {
+      els.ageGroup.value = "";
+      els.ageGroup.disabled = true;
+      els.ageGroup.innerHTML = '<option value="">Select a team first</option>';
+    }
+
+    refreshClassOptions();
+    runSearch();
   });
 }
 
