@@ -9,6 +9,34 @@ export function photoUrl(filename) {
   return IMAGE_BASE_URL + filename;
 }
 
+function openPhotoModal(imageUrl) {
+  const existing = document.getElementById("photoZoomModal");
+  if (existing) existing.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "photoZoomModal";
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "photo-modal-backdrop";
+
+  const content = document.createElement("div");
+  content.className = "photo-modal-content";
+
+  const img = document.createElement("img");
+  img.src = imageUrl;
+  img.alt = "Student photo";
+  img.className = "photo-modal-image";
+
+  content.appendChild(img);
+  backdrop.appendChild(content);
+  modal.appendChild(backdrop);
+
+  document.body.appendChild(modal);
+
+  backdrop.addEventListener("click", () => modal.remove());
+  content.addEventListener("click", e => e.stopPropagation());
+}
+
 function initials(s) {
   return `${(s.firstName || "?")[0] || ""}${(s.lastName || "?")[0] || ""}`.toUpperCase();
 }
@@ -64,17 +92,38 @@ export function renderCard(student) {
   card.type = "button";
   card.className = "student-card";
   card.dataset.adminNo = student.adminNo;
+
+  const imageUrl = photoUrl(student.photo);
+
   card.innerHTML = `
-    <div class="avatar avatar-card" style="width: 90px; height: 120px; overflow: hidden; margin: 0 auto;">
-      <img src="${photoUrl(student.photo)}" alt=""
-           loading="lazy"
-           style="width: 150%; height: 150%; object-fit: cover;"
-           onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'avatar-fallback',textContent:'${initials(student)}'}))" />
+    <div class="avatar avatar-card"
+         style="width: 90px; height: 120px; overflow: hidden; margin: 0 auto;">
+      <img
+        class="student-photo-preview"
+        src="${imageUrl}"
+        alt=""
+        loading="lazy"
+        data-full-image="${imageUrl}"
+        style="width: 150%; height: 150%; object-fit: cover; cursor: zoom-in;"
+        onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'avatar-fallback',textContent:'${initials(student)}'}))"
+      />
     </div>
-    <span class="card-name" style="display: block; margin-top: 8px;">${student.firstName} ${student.lastName}</span>
-    <span class="card-admin mono" style="display: block;">${student.registrationClass || ""}</span>
+
+    <span class="card-name" style="display:block; margin-top:8px;">
+      ${student.firstName} ${student.lastName}
+    </span>
     <span class="card-admin mono" style="display: block;">${student.adminNo}</span>
   `;
+
+  const img = card.querySelector(".student-photo-preview");
+
+  img?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    openPhotoModal(imageUrl); // <--- Updated here
+});
+
   return card;
 }
 
