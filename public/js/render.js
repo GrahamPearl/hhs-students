@@ -112,6 +112,7 @@ export function renderCard(student) {
     <span class="card-name" style="display:block; margin-top:8px;">
       ${student.firstName} ${student.lastName}
     </span>
+    <span class="card-admin mono" style="display: block;">${student.registrationClass}</span>
     <span class="card-admin mono" style="display: block;">${student.adminNo}</span>
   `;
 
@@ -194,66 +195,6 @@ export function renderDrawerHeader(student) {
     </div>
   `;
 }
-
-/** Read-only view: facts + subjects table, with an Edit button for admins. */
-/*
-export function renderDrawerView(student, isAdmin) {
-  const summaries = student.subjectsSummary || [];
-
-  // Sort subjects by line number (Line 1, Line 2, etc.) if enrollment line data exists
-  const sortedSummaries = [...summaries].sort((a, b) => {
-    const keyA = a.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const keyB = b.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const lineA = Number((student.enrollments || {})[keyA]?.line) || 99;
-    const lineB = Number((student.enrollments || {})[keyB]?.line) || 99;
-    return lineA - lineB;
-  });
-
-  const subjectRows = sortedSummaries.length
-    ? sortedSummaries
-        .map((name) => {
-          const key = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-          const enr = (student.enrollments || {})[key];
-          return `
-            <tr>
-              <td>${name}</td>
-              <td>${enr?.teacher || "—"}</td>
-              <td>${enr?.line ?? "—"}</td>
-            </tr>`;
-        })
-        .join("")
-    : `<tr><td colspan="3" class="empty-hint">No subjects on file</td></tr>`;
-
-  return `
-    ${isAdmin ? `
-      <div class="admin-drawer-actions" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
-        <button id="editStudentBtn" class="btn btn-primary btn-block">Edit student</button>
-        <button id="deleteStudentBtn" class="btn btn-danger btn-block" style="background-color: #d9534f; color: white;">Delete student</button>
-      </div>
-      <!-- Action Buttons -->
-      <div class="drawer-actions" style="margin-top: 20px; display: flex; gap: 8px;">
-        ${isAdmin ? `
-          <button type="button" class="btn btn-primary" id="editStudentBtn">Edit Student</button>
-          <button type="button" class="btn btn-outline" id="openTeamsModalBtn">⚽ Manage Teams</button>
-        ` : ''}
-      </div>
-    ` : ""}
-
-    <dl class="drawer-facts">
-      <div><dt>Registration class</dt><dd>${student.registrationClass || "—"}</dd></div>
-      <div><dt>Gender</dt><dd>${student.gender || "—"}</dd></div>
-      <div><dt>Age group</dt><dd>${student.agegroup || "—"}</dd></div>
-      <div><dt>Birthdate</dt><dd>${student.birthdate || "—"}</dd></div>
-    </dl>
-
-    <h3 class="drawer-subheading">Subjects</h3>
-    <table class="drawer-table">
-      <thead><tr><th>Subject</th><th>Teacher</th><th>Line</th></tr></thead>
-      <tbody>${subjectRows}</tbody>
-    </table>
-  `;
-}
-  */
 
 /**
  * Formats role titles into clean UI badges (e.g. captain -> Captain).
