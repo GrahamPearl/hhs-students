@@ -407,7 +407,7 @@ function wireEvents() {
     runSearch();
   });
 
-  els.filterClearBtn.addEventListener("click", () => {
+  /*els.filterClearBtn.addEventListener("click", () => {
     els.grade.value = "";
     els.class.value = "";
     els.gender.value = "";
@@ -424,6 +424,7 @@ function wireEvents() {
     refreshClassOptions();
     runSearch();
   });
+  */
 
   els.layoutBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -887,7 +888,7 @@ els.addStudentModalBtn.addEventListener("click", () => {
   document.body.classList.add("no-scroll");
 });
 
-els.drawerContent.addEventListener("submit", (e) => {
+els.drawerContent.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   if (e.target.id === "addStudentStep1Form") {
@@ -918,19 +919,21 @@ els.drawerContent.addEventListener("submit", (e) => {
   }
 
   if (e.target.id === "addStudentStep2Form") {
-    const inputs = els.drawerContent.querySelectorAll("[data-field]");
-    inputs.forEach((input) => {
-      const field = input.getAttribute("data-field");
-      newStudentDraft[field] = input.value;
-    });
+  const inputs = els.drawerContent.querySelectorAll("[data-field]");
+  inputs.forEach((input) => {
+    newStudentDraft[input.getAttribute("data-field")] = input.value;
+  });
 
-    newStudentDraft.photo = newStudentDraft.photo || "";
-
+  try {
+    await setDoc(doc(db, "students", newStudentDraft.adminNo), newStudentDraft);
     roster.unshift(newStudentDraft);
-
     closeDrawer();
     runSearch();
+  } catch (err) {
+    console.error("Failed to add student:", err);
+    alert("Could not create student in database.");
   }
+}
 });
 
 els.drawerContent.addEventListener("click", (e) => {
@@ -977,7 +980,7 @@ onAuthStateChanged(auth, async (user) => {
     const tokenResult = await user.getIdTokenResult().catch(() => ({ claims: {} }));
     const hasAdminClaim = Boolean(tokenResult.claims?.admin);
 
-    isAdmin = isStaffEmail || hasAdminClaim || true;
+    isAdmin = Boolean(isStaffEmail || hasAdminClaim);
 
     if (els.adminBadge) els.adminBadge.textContent = `Staff: ${user.email}`;
     els.adminBadge?.classList.remove("is-hidden");
