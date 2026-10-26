@@ -106,6 +106,7 @@ export function collectTeachers(students, subject) {
  * successful edit, so the table reflects it instantly without an extra
  * Firestore read. Returns the refreshed array.
  */
+
 export function patchCachedStudent(updatedRecord) {
   if (!memoryCache) return null;
   memoryCache = memoryCache.map((s) =>
@@ -113,4 +114,9 @@ export function patchCachedStudent(updatedRecord) {
   );
   writeSessionCache(memoryCache);
   return memoryCache;
+}
+
+export function clearRosterCache() {
+  memoryCache = null;
+  try { sessionStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
 }

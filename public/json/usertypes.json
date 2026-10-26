@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "collection": "authorized_users",
+  "types": {
+    "admin": {
+      "label": "Admin",
+      "level": 0,
+      "description": "Full access: edit students, bulk update, manage teams, manage users.",
+      "permissions": {
+        "view": true,
+        "viewTeams" : true,
+        "edit": true,
+        "addStudent": true,
+        "bulkUpdate": true,
+        "manageUsers": true
+      },
+      "links": [
+        { "label": "Teams", "href": "hhs-teams/teams.html" },
+        { "label": "Awards", "href": "awards.html" },
+        { "label": "Manage users", "href": "admin_users.html" }
+      ]
+    },
+    "staffHead": {
+      "label": "Head Staff",
+      "level": 0,
+      "description": "Full access: edit students, bulk update, manage teams, manage users.",
+      "permissions": {
+        "view": true,
+        "edit": true,
+        "addStudent": true,
+        "bulkUpdate": true,
+        "manageUsers": true
+      },
+      "links": [
+        { "label": "Teams", "href": "hhs-teams/teams.html" },
+        { "label": "Awards", "href": "awards.html" },
+        { "label": "Manage users", "href": "admin_users.html" }
+      ]
+    },
+    "staffGC": {
+      "label": "Staff - Grade Controller",
+      "level": 0,
+      "description": "Full access: edit students, manage teams.",
+      "permissions": {
+        "view": true,
+        "edit": true,
+        "addStudent": true,
+        "bulkUpdate": false,
+        "manageUsers": false
+      },
+      "links": [
+        { "label": "Teams", "href": "hhs-teams/teams.html" },
+        { "label": "Awards", "href": "awards.html" }
+      ]
+    },
+     "staffOffice": {
+      "label": "Staff - Office",
+      "level": 0,
+      "description": "Partial access: view students, view teams, view awards.",
+      "permissions": {
+        "view": true,
+        "edit": false,
+        "addStudent": false,
+        "bulkUpdate": false,
+        "manageUsers": false
+      },
+      "links": [
+        { "label": "Teams", "href": "hhs-teams/teams.html" },
+        { "label": "Awards", "href": "awards.html" }
+      ]
+    },
+    "staff": {
+      "label": "Staff",
+      "level": 2,
+      "description": "Read-only access to the roster and Teams.",
+      "permissions": {
+        "view": true,
+        "edit": false,
+        "addStudent": false,
+        "bulkUpdate": false,
+        "manageUsers": false
+      },
+      "links": [
+        { "label": "Teams", "href": "hhs-teams/teams.html" }
+      ]
+    },
+    "slt": {
+      "label": "SLT",
+      "level": 1,
+      "description": "Senior leadership: read-only access to the roster, plus teams.",
+      "permissions": {
+        "view": true,
+        "edit": false,
+        "addStudent": false,
+        "bulkUpdate": false,
+        "manageUsers": false
+      },
+      "links": [
+        { "label": "Teams", "href": "hhs-teams/teams.html" }
+      ]
+    }
+  }
+}

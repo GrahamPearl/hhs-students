@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helpers (claims set by scripts/set-claims.js) ----
+    function signedIn()     { return request.auth != null; }
+    function isAdmin()      { return signedIn() && (request.auth.token.admin == true || request.auth.token.awardsApprover == true); }
+    function canRecommend() { return signedIn() && (request.auth.token.canRecommend == true || isAdmin()); }
+    function isApprover()   { return signedIn() && request.auth.token.awardsApprover == true; }
+
+    // Fields only an approver may change on a student doc (award confirmation)
+    function awardFields() { return ['awards', 'teamMemberships', 'teamsSummary']; }
+    function onlyAwardFieldsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(awardFields());
+    }
+
+    // ---- students: public read; admins edit; approvers may also write award fields ----
+    match /students/{adminNo} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin();   // approver implies admin, so confirmation writes pass here
+    }
+
+    // ---- teams: public read; membership maintained by approvers (confirmation) or admins ----
+    match /teams/{teamId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin();
+    }
+
+    // ---- recommendations ----
+    match /awards-recommendations/{id} {
+      // Staff only: recommendations contain staff emails and notes
+      allow read: if canRecommend();
+
+      allow create: if canRecommend()
+        && request.resource.data.status == 'pending'
+        && request.resource.data.recommendedBy == request.auth.uid
+        && request.resource.data.confirmedBy == null;
+
+      // Only approvers may move a pending recommendation to confirmed/rejected
+      allow update: if isApprover()
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['confirmed', 'rejected']
+        && request.resource.data.adminNo == resource.data.adminNo
+        && request.resource.data.teamId == resource.data.teamId;
+
+      allow delete: if false;
+    }
+
+    // ---- audit log: written by edit transactions, readable by admins, immutable ----
+    match /auditLog/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.adminUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ---- subjects catalogue ----
+    match /subjects/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

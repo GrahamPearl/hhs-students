@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Activity Team Manager</title>
+
+  <!-- External Libraries -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Theme Stylesheet -->
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+
+<body>
+
+  <!-- Site Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="crest">
+        <i class="fa-solid fa-people-group"></i>
+      </div>
+      <div>
+        <h1 class="site-title">Activity Team Manager</h1>
+        <p class="site-subtitle">Roster Assignment & Co-Curricular Administration</p>
+      </div>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <button class="btn btn-on-dark" id="openManageBtn" title="Manage Activities & Renaming">
+          <i class="fa-solid fa-gear"></i> Manage
+        </button>
+        <button class="btn btn-on-dark" id="exportJsonBtn" title="Export current team as JSON">
+          <i class="fa-solid fa-file-export"></i>
+        </button>
+        <button class="btn btn-on-dark" id="importJsonBtn" title="Import team from JSON file">
+          <i class="fa-solid fa-file-import"></i>
+        </button>
+        <input type="file" id="importFileInput" accept=".json" class="is-hidden">
+        <button class="btn btn-on-dark" id="exportExcelBtn" title="Export current team to Excel">
+          <i class="fa-solid fa-file-excel"></i>
+        </button>
+        <button class="btn btn-on-dark" onclick="window.print()" title="Print roster">
+          <i class="fa-solid fa-print"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <!-- Filter Control Rail -->
+    <section class="control-rail">
+      <div class="filter-row">
+        <div>
+          <label for="activitySelect">Activity</label>
+          <select id="activitySelect"></select>
+        </div>
+        <div>
+          <label for="agegroupSelect">Age Group</label>
+          <select id="agegroupSelect"></select>
+        </div>
+        <div>
+          <label for="adminInput">Admin No</label>
+          <input type="text" id="adminInput" placeholder="e.g. 15332" class="mono" />
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary" id="addStudentBtn" title="Add student to team">
+            <i class="fa-solid fa-user-plus"></i> Add
+          </button>
+          <button class="btn" id="bulkAddBtn" title="Bulk Add via CSV/List">
+            <i class="fa-solid fa-users-medical"></i> Bulk
+          </button>
+          <button class="btn" id="removeStudentBtn" title="Remove student from team">
+            <i class="fa-solid fa-user-minus"></i>
+          </button>
+        </div>
+        <div class="field-grow">
+          <label for="rosterSearch">Search Roster</label>
+          <input type="text" id="rosterSearch" placeholder="🔍 Search members..." />
+        </div>
+      </div>
+    </section>
+
+    <!-- Results Meta / Header Bar -->
+    <div class="results-meta">
+      <div class="d-flex align-items-center gap-2">
+        <span id="teamHeading" class="fw-bold"
+          style="color: var(--ink); font-family: var(--font-serif); font-size: 1.1rem;"></span>
+        <span id="memberCount" class="pill pill-grade" style="display:none"></span>
+      </div>
+      <div id="genderStats" class="d-flex gap-2"></div>
+    </div>
+
+    <!-- Roster Display Grid -->
+    <div id="roster" class="results-grid grid-cols-4">
+      <div id="emptyState" class="empty-state-grid">
+        <div class="empty-state">
+          <i class="fa-solid fa-users-slash fa-2x mb-2" style="color: var(--text-muted);"></i>
+          <div>Select an activity and age group above to view the team.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status / Sync Strip -->
+    <div class="control-rail mt-4 d-flex align-items-center justify-content-between py-2">
+      <div class="d-flex align-items-center gap-2">
+        <span id="syncPill" class="badge badge-muted">Idle</span>
+        <span id="unsavedDot" class="text-warning small" style="display:none;">
+          <i class="fa-solid fa-circle" style="font-size:0.55rem;"></i> Unsaved changes (Auto-saving...)
+        </span>
+      </div>
+      <div class="small text-muted">
+        <i class="fa-solid fa-cloud"></i> Connected to Firestore
+      </div>
+    </div>
+</main> <!-- End of <main class="page"> -->
+
+  <!-- ========================================== -->
+  <!-- MODALS PLACED OUTSIDE MAIN AT BODY BOTTOM -->
+  <!-- ========================================== -->
+
+  <!-- Bulk Add Modal -->
+  <div class="modal fade" id="bulkAddModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" style="font-family: var(--font-serif); color: var(--ink);">Bulk Add Admin Numbers</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">Paste a comma, space, or newline-separated list of administration IDs.</p>
+          <textarea id="bulkInput" class="form-control mono" rows="6" placeholder="15332, 14944, 15216..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="processBulkAddBtn">Add to Roster</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage Activities Modal -->
+  <div class="modal fade" id="manageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" style="font-family: var(--font-serif); color: var(--ink);">
+            <i class="fa-solid fa-layer-group"></i> Manage & Rename Activities
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Current Active Name</th>
+                  <th>Rename Action</th>
+                  <th class="text-end">Hide</th>
+                </tr>
+              </thead>
+              <tbody id="manageTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer justify-content-between">
+          <small class="text-muted">Manage full list of Activities & Age Groups</small>
+          <a href="admin.html" class="btn btn-primary">
+            <i class="fa-solid fa-user-shield"></i> Admin Controls
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo Modal -->
+  <div id="imageModal" class="photo-modal-backdrop is-hidden" style="display: none;" tabindex="-1" aria-hidden="true">
+    <div class="photo-modal-content position-relative">
+      <button type="button" id="closeImageModalBtn" class="btn-close position-absolute top-0 end-0 m-2"
+        style="z-index:10; background-color: #fff;" aria-label="Close"></button>
+      <img id="modalImage" alt="Student Preview" />
+    </div>
+  </div>
+
+  <div id="toastContainer"
+    style="position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem;">
+  </div>
+
+  <!-- JavaScript Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="./js/config.js"></script>
+  <script type="module" src="./js/teams_app.js"></script>
+</body>
+</html>

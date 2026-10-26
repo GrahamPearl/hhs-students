@@ -1,27 +1,51 @@
 /**
  * auth-service.js
- * Wraps Firebase Auth: tracks the signed-in user and whether they carry
- * the "admin" custom claim. Admin status is set via a custom claim
- * (Firebase Admin SDK / Cloud Function) rather than a Firestore doc,
- * so checking it costs a token refresh, not a read.
+ * Wraps Firebase Auth and resolves staff roles from custom claims.
+ *
+ *   claims.admin           -> isAdmin (edit students)
+ *   claims.canRecommend    -> canRecommend (submit award recommendations)
+ *   claims.awardsApprover  -> isApprover AND isAdmin (approver implies admin)
+ *
+ * Claims are set server-side (Admin SDK). A user must sign out/in, or the app
+ * must call refreshClaims(), before a newly granted claim is visible.
  */
-import { auth, onAuthStateChanged } from "./firebase-init.js";
+import {
+  auth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from "./firebase-init.js";
 
-let state = { user: null, isAdmin: false, ready: false };
+let state = { user: null, role: null, isAdmin: false, canRecommend: false, isApprover: false, ready: false };
 const listeners = new Set();
+let seq = 0; // guards against out-of-order async claim lookups
 
-async function resolveAdmin(user) {
-  if (!user) return false;
-  const token = await user.getIdTokenResult();
-  return Boolean(token.claims.admin);
+async function resolveRoles(user) {
+  if (!user) return { role: null, isAdmin: false, canRecommend: false, isApprover: false };
+  const { claims } = await user.getIdTokenResult();
+  const isApprover = claims.awardsApprover === true;
+  const isAdmin = claims.admin === true || isApprover;
+  return {
+    role: claims.role || null, // admin | slt | supportStaff | teacherStaff | awardsApprover | headStaff
+    isApprover,
+    isAdmin,
+    canRecommend: claims.canRecommend === true || isAdmin,
+  };
+}
+
+function publish(next) {
+  state = next;
+  listeners.forEach((fn) => fn(state));
 }
 
 onAuthStateChanged(auth, async (user) => {
-  state = { user, isAdmin: await resolveAdmin(user), ready: true };
-  listeners.forEach((fn) => fn(state));
+  const mine = ++seq;
+  const roles = await resolveRoles(user);
+  if (mine !== seq) return; // a newer auth event superseded this one
+  publish({ user, ...roles, ready: true });
 });
 
-/** Subscribe to auth/admin changes. Calls fn immediately with current state. */
+/** Subscribe to auth/role changes. Calls fn immediately if state is ready. */
 export function onAuthChange(fn) {
   listeners.add(fn);
   if (state.ready) fn(state);
@@ -29,5 +53,24 @@ export function onAuthChange(fn) {
 }
 
 export function getAuthState() {
+  return state;
+}
+
+export function signInStaff(email, password) {
+  return signInWithEmailAndPassword(auth, email, password);
+}
+
+export function signOutStaff() {
+  return signOut(auth);
+}
+
+/** Force-refreshes the ID token so newly granted claims take effect. */
+export async function refreshClaims() {
+  const user = auth.currentUser;
+  if (!user) return state;
+  await user.getIdToken(true);
+  const mine = ++seq;
+  const roles = await resolveRoles(user);
+  if (mine === seq) publish({ user, ...roles, ready: true });
   return state;
 }

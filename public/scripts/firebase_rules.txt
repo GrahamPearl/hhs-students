@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isStaff() {
+      return request.auth != null && (
+        request.auth.token.email.endsWith("@hhs.co.za") ||
+        request.auth.token.admin == true
+      );
+    }
+
+    function isApprover() {
+      return isStaff() && (
+        request.auth.token.awardsApprover == true ||
+        request.auth.token.admin == true
+      );
+    }
+
+    match /timetables/{gradeDoc} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /students/{studentId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /teams/{teamId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /awards-recommendations/{recommendationId} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update: if isApprover();
+      allow delete: if isApprover();
+    }
+  }
+}

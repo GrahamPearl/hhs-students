@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function userDoc(id) {
+      return /databases/$(database)/documents/authorized_users/$(id);
+    }
+
+    // Returns the signed-in user's type, looked up by UID then by email; null if not listed.
+    function myType() {
+      return request.auth == null ? null :
+        (exists(userDoc(request.auth.uid))
+          ? get(userDoc(request.auth.uid)).data.type
+          : (request.auth.token.email != null &&
+             exists(userDoc(request.auth.token.email.lower()))
+              ? get(userDoc(request.auth.token.email.lower())).data.type
+              : null));
+    }
+
+    function canRead()  { return myType() != null && myType() in ['admin', 'slt', 'staff']; }
+    function isAdmin()  { return myType() == 'admin'; }
+
+    match /authorized_users/{id} {
+      allow read: if request.auth != null &&
+        (id == request.auth.uid || id == request.auth.token.email.lower());
+      allow write: if false;     // manage in the Firebase console
+    }
+
+    match /students/{adminNo} {
+      allow read:  if canRead();
+      allow write: if isAdmin();
+    }
+
+   match /teams/{id} {
+  	allow read:  if canRead();
+  	allow write: if isAdmin();
+   }
+
+  match /timetables/{id} {
+  	allow read:  if canRead();
+  	allow write: if isAdmin();
+  }
+}
+}
