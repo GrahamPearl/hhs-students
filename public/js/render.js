@@ -3,11 +3,27 @@
  * All DOM-building lives here, kept separate from data/search logic.
  */
 const { IMAGE_BASE_URL, FALLBACK_IMAGE } = window.APP_CONFIG;
+import { escapeHtml } from "./html.js";
+const esc = escapeHtml;
 
 export function photoUrl(filename) {
   if (!filename) return FALLBACK_IMAGE;
   return IMAGE_BASE_URL + filename;
 }
+
+// Swaps a broken photo for the student's initials (replaces all inline onerror handlers).
+document.addEventListener(
+  "error",
+  (ev) => {
+    const img = ev.target;
+    if (!(img instanceof HTMLImageElement) || !img.dataset.initials) return;
+    const span = document.createElement("span");
+    span.className = img.dataset.fallbackClass || "avatar-fallback";
+    span.textContent = img.dataset.initials;
+    img.replaceWith(span);
+  },
+  true, // error events don't bubble, so listen in the capture phase
+);
 
 function openPhotoModal(imageUrl) {
   const existing = document.getElementById("photoZoomModal");
@@ -34,7 +50,7 @@ function openPhotoModal(imageUrl) {
   document.body.appendChild(modal);
 
   backdrop.addEventListener("click", () => modal.remove());
-  content.addEventListener("click", e => e.stopPropagation());
+  content.addEventListener("click", (e) => e.stopPropagation());
 }
 
 function initials(s) {
@@ -45,10 +61,14 @@ function subjectBadges(subjects, max = 3) {
   if (!subjects || !subjects.length) {
     return `<span class="badge badge-muted">No subjects on file</span>`;
   }
-  const shown = subjects.slice(0, max).map((s) => `<span class="badge">${s}</span>`).join("");
-  const overflow = subjects.length > max
-    ? `<span class="badge badge-muted">+${subjects.length - max} more</span>`
-    : "";
+  const shown = subjects
+    .slice(0, max)
+    .map((s) => `<span class="badge">${s}</span>`)
+    .join("");
+  const overflow =
+    subjects.length > max
+      ? `<span class="badge badge-muted">+${subjects.length - max} more</span>`
+      : "";
   return shown + overflow;
 }
 
@@ -59,21 +79,20 @@ export function renderRow(student) {
   tr.innerHTML = `
     <td class="cell-photo">
       <div class="avatar">
-        <img src="${photoUrl(student.photo)}" alt=""
-             loading="lazy"
-             onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'avatar-fallback',textContent:'${initials(student)}'}))" />
+        <img src="${esc(photoUrl(student.photo))}" alt="" loading="lazy"
+             data-initials="${esc(initials(student))}" />
       </div>
     </td>
     <td class="cell-name">
-      <span class="student-name">${student.firstName} ${student.lastName}</span>
-      <span class="student-sub">${student.registrationClass || ""}</span>
+      <span class="student-name">${esc(student.firstName)} ${esc(student.lastName)}</span>
+      <span class="student-sub">${esc(student.registrationClass)}</span>
     </td>
-    <td class="cell-admin"><span class="mono">${student.adminNo}</span></td>
+    <td class="cell-admin"><span class="mono">${esc(student.adminNo)}</span></td>
     <td class="cell-grade">
-      <span class="pill pill-grade">Gr ${student.grade}</span>
-      <span class="pill pill-class">${student.class}</span>
+      <span class="pill pill-grade">Gr ${esc(student.grade)}</span>
+      <span class="pill pill-class">${esc(student.class)}</span>
     </td>
-    <td class="cell-gender">${student.gender || ""}</td>
+    <td class="cell-gender">${esc(student.gender)}</td>
     <td class="cell-subjects">${subjectBadges(student.subjectsSummary)}</td>
   `;
   return tr;
@@ -95,25 +114,25 @@ export function renderCard(student) {
 
   const imageUrl = photoUrl(student.photo);
 
-  card.innerHTML = `
+   card.innerHTML = `
     <div class="avatar avatar-card"
          style="width: 90px; height: 120px; overflow: hidden; margin: 0 auto;">
       <img
         class="student-photo-preview"
-        src="${imageUrl}"
+        src="${esc(imageUrl)}"
         alt=""
         loading="lazy"
-        data-full-image="${imageUrl}"
+        data-full-image="${esc(imageUrl)}"
+        data-initials="${esc(initials(student))}"
         style="width: 150%; height: 150%; object-fit: cover; cursor: zoom-in;"
-        onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'avatar-fallback',textContent:'${initials(student)}'}))"
       />
     </div>
 
     <span class="card-name" style="display:block; margin-top:8px;">
-      ${student.firstName} ${student.lastName}
+      ${esc(student.firstName)} ${esc(student.lastName)}
     </span>
-    <span class="card-admin mono" style="display: block;">${student.registrationClass}</span>
-    <span class="card-admin mono" style="display: block;">${student.adminNo}</span>
+    <span class="card-admin mono" style="display: block;">${esc(student.registrationClass)}</span>
+    <span class="card-admin mono" style="display: block;">${esc(student.adminNo)}</span>
   `;
 
   const img = card.querySelector(".student-photo-preview");
@@ -123,7 +142,7 @@ export function renderCard(student) {
     e.stopPropagation();
 
     openPhotoModal(imageUrl); // <--- Updated here
-});
+  });
 
   return card;
 }
@@ -151,13 +170,16 @@ export function renderActiveFilters(el, filters) {
     gender: (v) => v,
     subject: (v) => v,
     teacher: (v) => `Taught by ${v}`,
+    line: (v) => `Line ${v}`,
+    team: (v) => v,
+    ageGroup: (v) => `Age group ${v}`,
   };
   const chips = Object.entries(filters)
     .filter(([, v]) => v)
     .map(
       ([key, value]) => `
       <span class="chip chip-filter">
-        ${labels[key] ? labels[key](value) : value}
+        ${esc(labels[key] ? labels[key](value) : value)}
         <button type="button" class="chip-remove" data-clear-filter="${key}" aria-label="Clear ${key} filter">&times;</button>
       </span>`,
     )
@@ -166,9 +188,10 @@ export function renderActiveFilters(el, filters) {
 }
 
 export function renderResultCount(el, count, total) {
-  el.textContent = count === total
-    ? `${total} student${total === 1 ? "" : "s"}`
-    : `${count} of ${total} students`;
+  el.textContent =
+    count === total
+      ? `${total} student${total === 1 ? "" : "s"}`
+      : `${count} of ${total} students`;
 }
 
 export function renderEmptyState(tbody, colSpan) {
@@ -184,14 +207,15 @@ export function renderEmptyState(tbody, colSpan) {
 }
 
 export function renderDrawerHeader(student) {
-  return `
+    return `
     <div class="avatar avatar-lg">
-      <img src="${photoUrl(student.photo)}" alt=""
-           onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'avatar-fallback avatar-fallback-lg',textContent:'${initials(student)}'}))" />
+      <img src="${esc(photoUrl(student.photo))}" alt=""
+           data-initials="${esc(initials(student))}"
+           data-fallback-class="avatar-fallback avatar-fallback-lg" />
     </div>
     <div>
-      <h2 class="drawer-name">${student.firstName} ${student.lastName}</h2>
-      <p class="drawer-meta">Admin No <span class="mono">${student.adminNo}</span> · Grade ${student.grade} · ${student.class}</p>
+      <h2 class="drawer-name">${esc(student.firstName)} ${esc(student.lastName)}</h2>
+      <p class="drawer-meta">Admin No <span class="mono">${esc(student.adminNo)}</span> · Grade ${esc(student.grade)} · ${esc(student.class)}</p>
     </div>
   `;
 }
@@ -220,14 +244,18 @@ function renderRoleBadge(role) {
   const normalizedRole = role.toLowerCase();
 
   // Highlight leadership/captain roles differently from volunteer/other roles
-  let badgeStyle = "background-color: #f1f3f4; color: #5f6368; border: 1px solid #dadce0;";
+  let badgeStyle =
+    "background-color: #f1f3f4; color: #5f6368; border: 1px solid #dadce0;";
 
   if (normalizedRole === "captain" || normalizedRole === "vice-captain") {
-    badgeStyle = "background-color: #e8f0fe; color: #1a73e8; border: 1px solid #aecbfa;";
+    badgeStyle =
+      "background-color: #e8f0fe; color: #1a73e8; border: 1px solid #aecbfa;";
   } else if (normalizedRole === "leadership") {
-    badgeStyle = "background-color: #fce8e6; color: #c5221f; border: 1px solid #fad2cf;";
+    badgeStyle =
+      "background-color: #fce8e6; color: #c5221f; border: 1px solid #fad2cf;";
   } else if (normalizedRole === "volunteer") {
-    badgeStyle = "background-color: #e6f4ea; color: #137333; border: 1px solid #ceead6;";
+    badgeStyle =
+      "background-color: #e6f4ea; color: #137333; border: 1px solid #ceead6;";
   }
 
   return `
@@ -240,7 +268,7 @@ function renderRoleBadge(role) {
       margin-left: 6px;
       ${badgeStyle}
     ">
-      ${formattedRole}
+      ${esc(formattedRole)}
     </span>
   `;
 }
@@ -268,9 +296,9 @@ export function renderDrawerView(student, isAdmin) {
           const enr = (student.enrollments || {})[key];
           return `
             <tr>
-              <td>${name}</td>
-              <td>${enr?.teacher || "—"}</td>
-              <td>${enr?.line ?? "—"}</td>
+              <td>${esc(name)}</td>
+              <td>${esc(enr?.teacher || "—")}</td>
+              <td>${esc(enr?.line ?? "—")}</td>
             </tr>`;
         })
         .join("")
@@ -282,7 +310,7 @@ export function renderDrawerView(student, isAdmin) {
     ? teams
         .map((t) => {
           const rawTeam = t.teamName || t.team || "";
-          
+
           // Split on '||'
           const parts = rawTeam.split("||").map((s) => s.trim());
           const teamName = parts[0] || rawTeam || "—";
@@ -294,9 +322,9 @@ export function renderDrawerView(student, isAdmin) {
 
           return `
             <tr>
-              <td>${teamName}</td>
-              <td>${groupName}</td>
-              <td>${formattedRole}</td>
+              <td>${esc(teamName)}</td>
+              <td>${esc(groupName)}</td>
+              <td>${esc(formattedRole)}</td>
             </tr>`;
         })
         .join("")
@@ -314,11 +342,15 @@ export function renderDrawerView(student, isAdmin) {
         : ""
     }
 
+    <div style="margin-bottom:16px;">
+      <button type="button" id="openStudentTimetableBtn" class="btn" style="width:100%;">🗓 View timetable</button>
+    </div>
+
     <dl class="drawer-facts">
-      <div><dt>Registration class</dt><dd>${student.registrationClass || "—"}</dd></div>
-      <div><dt>Gender</dt><dd>${student.gender || "—"}</dd></div>
-      <div><dt>Age group</dt><dd>${student.agegroup || "—"}</dd></div>
-      <div><dt>Birthdate</dt><dd>${student.birthdate || "—"}</dd></div>
+      <div><dt>Registration class</dt><dd>${esc(student.registrationClass || "—")}</dd></div>
+      <div><dt>Gender</dt><dd>${esc(student.gender || "—")}</dd></div>
+      <div><dt>Age group</dt><dd>${esc(student.agegroup || "—")}</dd></div>
+      <div><dt>Birthdate</dt><dd>${esc(student.birthdate || "—")}</dd></div>
     </dl>
 
     <h3 class="drawer-subheading">Subjects</h3>
@@ -348,10 +380,14 @@ export function renderDrawerView(student, isAdmin) {
 }
 
 /** Editable form: field inputs + removable subject chips + add-subject row. */
-// Helper inside render.js to extract unique teachers for a given subject from global roster if needed, 
+// Helper inside render.js to extract unique teachers for a given subject from global roster if needed,
 // or you can pass a teacher lookup map. For simplicity, we can generate options dynamically.
 
-export function renderDrawerEdit(draft, subjectOptions, allTeachersBySubject = {}) {
+export function renderDrawerEdit(
+  draft,
+  subjectOptions,
+  allTeachersBySubject = {},
+) {
   const subjectRows = (draft.subjectsSummary || []).length
     ? draft.subjectsSummary
         .map((currentSub, index) => {
@@ -362,60 +398,72 @@ export function renderDrawerEdit(draft, subjectOptions, allTeachersBySubject = {
 
           // Options for swapping the subject
           const subjectOptionsHtml = subjectOptions
-            .map((s) => `<option value="${s}" ${s === currentSub ? "selected" : ""}>${s}</option>`)
+            .map(
+              (s) =>
+                `<option value="${esc(s)}" ${s === currentSub ? "selected" : ""}>${esc(s)}</option>`,
+            )
             .join("");
 
           // Get teachers available for this specific subject
-          const teachersList = allTeachersBySubject[currentSub] || [currentTeacher].filter(Boolean);
+          const teachersList =
+            allTeachersBySubject[currentSub] ||
+            [currentTeacher].filter(Boolean);
           const teacherOptionsHtml = teachersList
-            .map((t) => `<option value="${t}" ${t === currentTeacher ? "selected" : ""}>${t}</option>`)
+            .map(
+              (t) =>
+                `<option value="${esc(t)}" ${t === currentTeacher ? "selected" : ""}>${esc(t)}</option>`,
+            )
             .join("");
 
           return `
             <div class="edit-subject-row" data-index="${index}" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
               <!-- (a) Swap Subject Dropdown -->
-              <select class="edit-subject-select" data-old-subject="${currentSub}" style="flex: 2;">
+              <select class="edit-subject-select" data-old-subject="${esc(currentSub)}" style="flex: 2;">
                 ${subjectOptionsHtml}
               </select>
 
               <!-- (b) Swap Teacher Dropdown -->
-              <select class="edit-teacher-select" data-subject-key="${key}" style="flex: 2;">
+              <select class="edit-teacher-select" data-subject-key="${esc(key)}" style="flex: 2;">
                 <option value="">Select teacher...</option>
                 ${teacherOptionsHtml}
               </select>
 
               <!-- (c) Change Subject Line Input -->
-              <input type="number" class="edit-line-input" data-subject-key="${key}" value="${currentLine}" min="1" max="10" placeholder="Line" style="width: 70px;" title="Subject Line Number" />
+              <input type="number" class="edit-line-input" data-subject-key="${esc(key)}" value="${esc(currentLine)}" min="1" max="10" placeholder="Line" style="width: 70px;" title="Subject Line Number" />
 
-              <button type="button" class="btn btn-ghost btn-sm chip-remove" data-remove-subject="${currentSub}" title="Remove subject">&times;</button>
+              <button type="button" class="btn btn-ghost btn-sm chip-remove" data-remove-subject="${esc(currentSub)}" title="Remove subject">&times;</button>
             </div>`;
         })
         .join("")
     : `<p class="empty-hint">No subjects assigned.</p>`;
 
-  const availableToAdd = subjectOptions.filter((s) => !draft.subjectsSummary.includes(s));
-  const addOptionsHtml = availableToAdd.map((s) => `<option value="${s}">${s}</option>`).join("");
+  const availableToAdd = subjectOptions.filter(
+    (s) => !draft.subjectsSummary.includes(s),
+  );
+  const addOptionsHtml = availableToAdd
+    .map((s) => `<option value="${s}">${s}</option>`)
+    .join("");
 
   return `
     <form id="editForm" class="edit-form">
       <div class="edit-grid">
         <div>
           <label for="editFirstName">First name</label>
-          <input id="editFirstName" data-field="firstName" type="text" value="${draft.firstName}" required />
+          <input id="editFirstName" data-field="firstName" type="text" value="${esc(draft.firstName)}" required />
         </div>
         <div>
           <label for="editLastName">Last name</label>
-          <input id="editLastName" data-field="lastName" type="text" value="${draft.lastName}" required />
+          <input id="editLastName" data-field="lastName" type="text" value="${esc(draft.lastName)}" required />
         </div>
         <div>
           <label for="editGrade">Grade</label>
           <select id="editGrade" data-field="grade">
-            ${[8, 9, 10, 11, 12].map((g) => `<option value="${g}" ${Number(draft.grade) === g ? "selected" : ""}>${g}</option>`).join("")}
+            ${[8, 9, 10, 11, 12].map((g) => `<option value="${esc(g)}" ${esc(Number(draft.grade)) === g ? "selected" : ""}>${esc(g)}</option>`).join("")}
           </select>
         </div>
         <div>
           <label for="editClass">Class</label>
-          <input id="editClass" data-field="class" type="text" value="${draft.class}" required />
+          <input id="editClass" data-field="class" type="text" value="${esc(draft.class)}" required />
         </div>
         <div>
           <label for="editGender">Gender</label>
@@ -448,7 +496,12 @@ export function renderDrawerEdit(draft, subjectOptions, allTeachersBySubject = {
   `;
 }
 
-export function renderAddStudentForm(step = 1, adminNoValue = "", studentData = {}, subjectOptions = []) {
+export function renderAddStudentForm(
+  step = 1,
+  adminNoValue = "",
+  studentData = {},
+  subjectOptions = [],
+) {
   if (step === 1) {
     return `
       <form id="addStudentStep1Form" class="edit-form">
@@ -457,7 +510,7 @@ export function renderAddStudentForm(step = 1, adminNoValue = "", studentData = 
         
         <div style="margin-bottom: 16px;">
           <label for="newAdminNo">Admin Number</label>
-          <input id="newAdminNo" type="text" value="${adminNoValue}" required autocomplete="off" />
+          <input id="newAdminNo" type="text" value="${esc(adminNoValue)}" required autocomplete="off" />
         </div>
 
         <p id="step1Error" class="error-text"></p>
@@ -471,13 +524,13 @@ export function renderAddStudentForm(step = 1, adminNoValue = "", studentData = 
 
   // Step 2: Capture remaining details & subjects
   const availableSubjectsHtml = subjectOptions
-    .map((s) => `<option value="${s}">${s}</option>`)
+    .map((s) => `<option value="${esc(s)}">${esc(s)}</option>`)
     .join("");
 
   return `
     <form id="addStudentStep2Form" class="edit-form">
       <h3 class="drawer-subheading">Add New Student: Step 2</h3>
-      <p class="drawer-meta">Admin No: <span class="mono"><strong>${adminNoValue}</strong></span></p>
+      <p class="drawer-meta">Admin No: <span class="mono"><strong>${esc(adminNoValue)}</strong></span></p>
 
       <div class="edit-grid">
         <div>
@@ -591,9 +644,32 @@ export function renderTeamRow(studentTeam = {}, availableTeams = []) {
   const selectedTeamName = studentTeam.teamName || "";
   const selectedAgeGroup = studentTeam.ageGroup || "";
   const selectedRole = studentTeam.role || "member";
+  const roles = window.APP_CONFIG.TEAM_ROLES;
+  const isSelected = (r) => r.toLowerCase() === selectedRole.toLowerCase();
 
-  const roles = ["member", "captain", "vice-captain", "leadership", "volunteer"];
-  const ageGroups = ["1st", "2nd", "Grade 8", "Grade 9", "Grade 9", "Grade 10", "Grade 11", "Grade 12", "U14", "U15", "U16", "U17", "U18", "U19", "Open", "Junior", "Senior"];
+  const ageGroups = [
+    "1st",
+    "2nd",
+    "Grade 8",
+    "Grade 9",
+    "Grade 10",
+    "Grade 11",
+    "Grade 12",
+    "U14",
+    "U15",
+    "U16",
+    "U17",
+    "U18",
+    "U19",
+    "Open",
+    "Junior",
+    "Senior",
+  ];
+
+  const team = availableTeams.find((t) => t.teamName === selectedTeamName);
+  const groups = team ? Object.keys(team.ageGroups) : [];
+  if (selectedAgeGroup && !groups.includes(selectedAgeGroup))
+    groups.push(selectedAgeGroup);
 
   return `
     <div class="team-edit-row" style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
@@ -603,11 +679,15 @@ export function renderTeamRow(studentTeam = {}, availableTeams = []) {
         <label style="font-size: 0.75rem; font-weight: 600;">Team</label>
         <select class="form-control team-select" required style="width: 100%;">
           <option value="">Select Team...</option>
-          ${availableTeams.map(t => `
+          ${availableTeams
+            .map(
+              (t) => `
             <option value="${t.id || t.teamName}" ${t.teamName === selectedTeamName ? "selected" : ""}>
               ${t.teamName}
             </option>
-          `).join("")}
+          `,
+            )
+            .join("")}
         </select>
       </div>
 
@@ -616,9 +696,13 @@ export function renderTeamRow(studentTeam = {}, availableTeams = []) {
         <label style="font-size: 0.75rem; font-weight: 600;">Group</label>
         <select class="form-control team-group-select" required style="width: 100%;">
           <option value="">Select Group...</option>
-          ${ageGroups.map(g => `
+          ${ageGroups
+            .map(
+              (g) => `
             <option value="${g}" ${g === selectedAgeGroup ? "selected" : ""}>${g}</option>
-          `).join("")}
+          `,
+            )
+            .join("")}
         </select>
       </div>
 
@@ -626,11 +710,15 @@ export function renderTeamRow(studentTeam = {}, availableTeams = []) {
       <div style="flex: 1.5;">
         <label style="font-size: 0.75rem; font-weight: 600;">Role</label>
         <select class="form-control student-role-select" required style="width: 100%;">
-          ${roles.map(r => `
-            <option value="${r}" ${r === selectedRole ? "selected" : ""}>
+          ${roles
+            .map(
+              (r) => `
+            <option value="${r}" ${isSelected(r) ? "selected" : ""}>
               ${r.charAt(0).toUpperCase() + r.slice(1)}
             </option>
-          `).join("")}
+          `,
+            )
+            .join("")}
         </select>
       </div>
 
@@ -641,38 +729,6 @@ export function renderTeamRow(studentTeam = {}, availableTeams = []) {
         </button>
       </div>
 
-    </div>
-  `;
-}
-
-export function renderUserManagementModal(usersList = []) {
-  return `
-    <div class="modal-backdrop" id="userModalBackdrop">
-      <div class="modal-content" style="max-width: 600px; background: white; padding: 24px; border-radius: 8px;">
-        <h3>User Access Management</h3>
-        <p class="empty-hint">Add or edit authorized user roles (Admin & Head Staff only).</p>
-        
-        <form id="saveUserForm" style="margin-top: 16px;">
-          <div class="form-group" style="margin-bottom: 12px;">
-            <label>User Email or UID</label>
-            <input type="text" id="targetUserId" class="form-control" placeholder="user@school.edu" required style="width:100%;" />
-          </div>
-          <div class="form-group" style="margin-bottom: 12px;">
-            <label>Access Type / Role</label>
-            <select id="targetUserType" class="form-control" required style="width:100%;">
-              <option value="staff">Staff (Search queries)</option>
-              <option value="slt">SLT (Search queries)</option>
-              <option value="staffhead">Head Staff (Search + User Management)</option>
-              <option value="admin">Admin (Full Access)</option>
-            </select>
-          </div>
-          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px;">
-            <button type="button" id="closeUserModalBtn" class="btn btn-secondary">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save User Access</button>
-          </div>
-        </form>
-        <p id="userModalError" class="error-text" style="color: #dc3545; margin-top: 8px;"></p>
-      </div>
     </div>
   `;
 }
