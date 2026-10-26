@@ -18,8 +18,8 @@
         { "label": "Teams", "href": "hhs-teams/teams.html" },
         { "label": "Awards", "href": "awards.html" },
         { "label": "Manage users", "href": "admin_users.html" },
-        { "label": "Seating plans", "href": "seating-class.html" },
-        { "label": "Seating plans", "href": "seating-teacher.html" }
+        { "label": "Seating plans 8-9", "href": "seating-class.html" },
+        { "label": "Seating plans 10-11", "href": "seating-teacher.html" }
       ]
     },
     "staffHead": {
