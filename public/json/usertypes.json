@@ -8,21 +8,22 @@
       "description": "Full access: edit students, bulk update, manage teams, manage users.",
       "permissions": {
         "view": true,
-        "viewTeams" : true,
+        "viewTeams": true,
         "edit": true,
         "addStudent": true,
         "bulkUpdate": true,
-        "manageUsers": true
+        "manageUsers": true,
+        "editTimetable": true
       },
       "links": [
         { "label": "Teams", "href": "hhs-teams/teams.html" },
         { "label": "Awards", "href": "awards.html" },
         { "label": "Manage users", "href": "admin_users.html" },
-        { "label": "Seating plans 8-9", "href": "seating-class.html" },
-        { "label": "Seating plans 10-11", "href": "seating-teacher.html" }
+        { "label": "Seating plans", "href": "seating-class.html" },
+        { "label": "Seating plans", "href": "seating-teacher.html" }
       ]
     },
-    "staffHead": {
+    "staff-head": {
       "label": "Head Staff",
       "level": 0,
       "description": "Full access: edit students, bulk update, manage teams, manage users.",
@@ -31,7 +32,8 @@
         "edit": true,
         "addStudent": true,
         "bulkUpdate": true,
-        "manageUsers": true
+        "manageUsers": true,
+        "editTimetable": true
       },
       "links": [
         { "label": "Teams", "href": "hhs-teams/teams.html" },
@@ -39,12 +41,15 @@
         { "label": "Manage users", "href": "admin_users.html" }
       ]
     },
-    "staffGC": {
+    "staff-gc": {
       "label": "Staff - Grade Controller",
       "level": 0,
       "description": "Full access: edit students, manage teams.",
       "permissions": {
         "view": true,
+        "viewTeams": true,
+        "editTeams": true,
+        "teamsAdmin": false,
         "edit": true,
         "addStudent": true,
         "bulkUpdate": false,
@@ -55,7 +60,7 @@
         { "label": "Awards", "href": "awards.html" }
       ]
     },
-     "staffOffice": {
+    "staff-office": {
       "label": "Staff - Office",
       "level": 0,
       "description": "Partial access: view students, view teams, view awards.",
@@ -82,9 +87,7 @@
         "bulkUpdate": false,
         "manageUsers": false
       },
-      "links": [
-        { "label": "Teams", "href": "hhs-teams/teams.html" }
-      ]
+      "links": [{ "label": "Teams", "href": "hhs-teams/teams.html" }]
     },
     "slt": {
       "label": "SLT",
@@ -97,9 +100,7 @@
         "bulkUpdate": false,
         "manageUsers": false
       },
-      "links": [
-        { "label": "Teams", "href": "hhs-teams/teams.html" }
-      ]
+      "links": [{ "label": "Teams", "href": "hhs-teams/teams.html" }]
     }
   }
 }

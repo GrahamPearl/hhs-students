@@ -2,7 +2,6 @@ import {
   db,
   doc,
   updateDoc,
-  setDoc,
   writeBatch,
   collection,
   getDocs,
@@ -24,6 +23,11 @@ import {
 } from "./data-service.js";
 
 import { filterStudents, sortStudents } from "./search.js";
+import {
+  initTimetableModule,
+  openStudentTimetableModal,
+  openGradeTimetableModal,
+} from "./timetable.js";
 
 import {
   renderRows,
@@ -36,7 +40,8 @@ import {
   renderDrawerEdit,
   renderAddStudentForm,
   renderBulkUpdateModal,
-  renderTeamRow, // <--- CRITICAL IMPORT FIX
+  renderTeamRow,
+  renderActiveFilters,
 } from "./render.js";
 
 import {
@@ -115,11 +120,6 @@ let newStudentDraft = {};
 let currentTeamsStudentAdminNo = null;
 let allAvailableTeams = [];
 
-// near the other state variables
-let rosterLoaded = false;
-let resolveAuthReady;
-const authReady = new Promise((r) => (resolveAuthReady = r));
-
 const LOADING_HTML = `<span class="spinner" aria-hidden="true"></span><span>Loading student roster…</span>`;
 
 let currentUser = null;
@@ -131,7 +131,6 @@ function showAuthError(msg) {
     document.getElementById("authError") ||
     createAuthErrorElement(els.authForm);
   el.textContent = msg;
-  els.authPopover?.classList.remove("is-hidden");
 }
 
 function showLoginRequired() {
@@ -187,6 +186,10 @@ function applyAuthUi(user) {
 
   document.getElementById("loginGate")?.classList.toggle("is-hidden", signedIn);
   document.body.classList.toggle("is-locked", !signedIn);
+  document
+    .getElementById("openTimetableBtn")
+    ?.classList.toggle("is-hidden", !can(userTypes, userType, "editTimetable"));
+
   els.authWidget.dataset.userType = signedIn ? userType || "" : "";
 
   if (els.adminBadge) {
@@ -206,6 +209,7 @@ function applyAuthUi(user) {
   );
   renderAuthLinks(signedIn ? def : null);
 }
+
 function setAuthStatus(msg) {
   const el = document.getElementById("authStatus");
   if (el) el.textContent = msg;
@@ -275,7 +279,6 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 function focusLogin() {
-  els.authPopover?.classList.remove("is-hidden");
   els.authEmail?.focus();
 }
 
@@ -306,6 +309,8 @@ function runSearch() {
   }
 
   renderResultCount(els.resultCount, results.length, roster.length);
+  const { term, field, ...filters } = state();
+  renderActiveFilters(document.getElementById("activeFilters"), filters);
 
   if (results.length === 0) {
     if (currentLayout === "list") {
@@ -325,13 +330,24 @@ function runSearch() {
 
 async function loadAvailableTeams() {
   try {
-    const [snap, metaSnap] = await Promise.all([getDocs(collection(db, "teams")), getDoc(doc(db, "teams", "_metadata"))]);
-    const hidden = new Set(metaSnap.exists() ? metaSnap.data().hidden || [] : []);
+    const [snap, metaSnap] = await Promise.all([
+      getDocs(collection(db, "teams")),
+      getDoc(doc(db, "teams", "_metadata")),
+    ]);
+    const hidden = new Set(
+      metaSnap.exists() ? metaSnap.data().hidden || [] : [],
+    );
     allAvailableTeams = snap.docs
       .filter((d) => !d.id.startsWith("_") && !d.id.includes("||"))
       .map((d) => {
         const x = d.data();
-        return { id: d.id, teamName: x.teamName || d.id, ageGroups: Object.fromEntries(Object.keys(x.ageGroups || {}).map((g) => [g, true])) };
+        return {
+          id: d.id,
+          teamName: x.teamName || d.id,
+          ageGroups: Object.fromEntries(
+            Object.keys(x.ageGroups || {}).map((g) => [g, true]),
+          ),
+        };
       })
       .filter((t) => !hidden.has(t.teamName))
       .sort((a, b) => a.teamName.localeCompare(b.teamName));
@@ -556,6 +572,22 @@ async function wireEvents() {
     e.preventDefault();
     runSearch();
   });
+
+  els.resultsGrid.addEventListener("click", (e) => {
+    const card = e.target.closest(".student-card");
+    if (card) openDrawer(card.dataset.adminNo);
+  });
+
+  document.getElementById("activeFilters").addEventListener("click", (e) => {
+    const key = e.target.closest("[data-clear-filter]")?.dataset.clearFilter;
+    if (!key || !els[key]) return;
+    els[key].value = "";
+    if (key === "grade") refreshClassOptions();
+    if (key === "subject") refreshTeacherOptions();
+    if (key === "team") refreshAgeGroupOptions();
+    runSearch();
+  });
+
   els.query.addEventListener("input", debounce(runSearch, 150));
   els.field.addEventListener("change", runSearch);
   els.gender.addEventListener("change", runSearch);
@@ -609,19 +641,6 @@ async function wireEvents() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeDrawer();
   });
-
-  if (els.authToggleBtn && els.authPopover) {
-    els.authToggleBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      els.authPopover.classList.toggle("is-hidden");
-    });
-
-    document.addEventListener("click", (e) => {
-      if (els.authWidget && !els.authWidget.contains(e.target)) {
-        els.authPopover.classList.add("is-hidden");
-      }
-    });
-  }
 
   els.openFiltersBtn.addEventListener("click", () => {
     els.filterModal.classList.toggle("is-hidden");
@@ -693,6 +712,16 @@ async function wireEvents() {
 
   // Combined Drawer Content Click Handler (Edit Student AND Manage Teams)
   els.drawerContent.addEventListener("click", (e) => {
+    if (e.target.closest("#openStudentTimetableBtn")) {
+      const s = roster.find(
+        (x) => String(x.adminNo) === String(els.drawer.dataset.activeAdminNo),
+      );
+      if (s)
+        openStudentTimetableModal(s, {
+          canEdit: can(userTypes, userType, "editTimetable"),
+        });
+    }
+
     if (
       e.target.id === "editStudentBtn" ||
       e.target.closest("#editStudentBtn")
@@ -1336,6 +1365,11 @@ if (signOutBtn) {
 
 function init() {
   wireEvents();
+  initTimetableModule();
+  document.getElementById("openTimetableBtn")?.addEventListener("click", () => {
+    if (!can(userTypes, userType, "editTimetable")) return;
+    openGradeTimetableModal(8, { canEdit: true });
+  });
 }
 
 init();
