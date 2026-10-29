@@ -2,12 +2,14 @@
 import { state, commit, persistMeta, selectTeam, metaFromTeams } from "./store.js";
 import { download, splitKey, toast } from "./utils.js";
 import { setSelection } from "./filters.js";
+import { loadLibs } from "../../js/lazy-libs.js";
 import { CONFIG } from "./config.js";
 
 const safeName = s => s.replace(/[^a-z0-9_-]/gi, "_");
 
-export function exportExcel() {
+export async function exportExcel() {
   if (!state.key || !state.roster.length) return toast("Select a team with members first.", "warn");
+  try { await loadLibs("xlsx"); } catch (e) { return toast(e.message, "danger"); }
   const [activity, age] = splitKey(state.key);
   const rows = state.roster.map((adm, i) => {
     const s = state.students.get(adm);
